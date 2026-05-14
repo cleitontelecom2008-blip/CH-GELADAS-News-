@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#04060d">
+<title>Cadastro — CH Geladas SaaS</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-height:100vh; margin:0; display:flex; align-items:center; justify-content:center; padding:1rem; }
+
+.card { background:rgba(15,23,42,.95); border:1px solid rgba(255,255,255,.08); border-radius:2rem; padding:2rem 1.75rem; width:min(100%,440px); box-shadow:0 32px 80px rgba(0,0,0,.6); }
+.logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; color:#fff; margin-bottom:.15rem; }
+.sub  { font-size:.65rem; color:#475569; font-weight:700; text-transform:uppercase; letter-spacing:.1em; margin-bottom:2rem; }
+
+/* abas */
+.tabs { display:flex; gap:.375rem; margin-bottom:1.5rem; background:rgba(255,255,255,.04); border-radius:.875rem; padding:.3rem; }
+.tab  { flex:1; text-align:center; padding:.6rem; border-radius:.625rem; font-size:.72rem; font-weight:700; cursor:pointer; color:#64748b; transition:.2s; }
+.tab.on { background:rgba(167,139,250,.15); color:#a78bfa; }
+
+.label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#64748b; margin-bottom:.3rem; display:block; }
+.inp   { width:100%; background:rgba(255,255,255,.04); border:1.5px solid rgba(255,255,255,.08); border-radius:.75rem; color:#f1f5f9; font-size:.95rem; padding:.75rem 1rem; outline:none; font-family:'DM Sans',sans-serif; transition:.2s; margin-bottom:.875rem; }
+.inp:focus { border-color:rgba(167,139,250,.5); background:rgba(167,139,250,.05); }
+.inp.err   { border-color:#f87171; }
+
+/* planos */
+.planos-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; margin-bottom:.875rem; }
+.plano-btn   { padding:.7rem .4rem; border-radius:.75rem; text-align:center; cursor:pointer; border:1.5px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03); transition:.2s; }
+.plano-btn.sel { border-color:rgba(167,139,250,.5); background:rgba(167,139,250,.1); }
+.plano-nome  { font-size:.72rem; font-weight:800; color:#e2e8f0; }
+.plano-desc  { font-size:.58rem; color:#64748b; margin-top:.2rem; line-height:1.3; }
+
+.btn-primary { width:100%; padding:1rem; border-radius:1rem; font-family:'Syne',sans-serif; font-weight:800; font-size:.9rem; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; border:none; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#fff; box-shadow:0 8px 24px rgba(124,58,237,.3); transition:.2s; margin-top:.25rem; }
+.btn-primary:disabled { opacity:.4; cursor:not-allowed; }
+.btn-primary:not(:disabled):active { transform:scale(.98); }
+
+.msg-err  { font-size:.72rem; color:#f87171; font-weight:700; text-align:center; min-height:1.2rem; margin:.25rem 0 .75rem; }
+.msg-ok   { font-size:.75rem; color:#34d399; font-weight:700; text-align:center; padding:.75rem; background:rgba(16,185,129,.1); border-radius:.75rem; }
+.link-small { font-size:.68rem; color:#64748b; text-align:center; margin-top:1.25rem; }
+.link-small a { color:#a78bfa; font-weight:700; }
+
+/* convite badge */
+.convite-badge { display:inline-flex; align-items:center; gap:.5rem; font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; letter-spacing:.15em; color:#a78bfa; background:rgba(167,139,250,.1); border:1px solid rgba(167,139,250,.25); border-radius:.875rem; padding:.75rem 1.25rem; width:100%; justify-content:center; margin-bottom:.875rem; }
+.empresa-id-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06); border-radius:.75rem; padding:.75rem 1rem; font-size:.75rem; color:#94a3b8; font-family:monospace; margin-bottom:.875rem; word-break:break-all; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div style="font-size:2.25rem;margin-bottom:.5rem">🍺</div>
+  <p class="logo">CH Geladas SaaS</p>
+  <p class="sub">Gerencie seu negócio</p>
+
+  <!-- ABAS -->
+  <div class="tabs">
+    <div class="tab on" onclick="setAba('registro')"  id="tab-registro">Nova Empresa</div>
+    <div class="tab"    onclick="setAba('login')"     id="tab-login">Entrar</div>
+    <div class="tab"    onclick="setAba('convite')"   id="tab-convite">Convite</div>
+  </div>
+
+  <!-- ABA REGISTRO -->
+  <div id="aba-registro">
+    <label class="label">Nome da empresa</label>
+    <input type="text" id="regEmpresa" class="inp" placeholder="Ex: Depósito do João">
+
+    <label class="label">Seu nome (usuário dono)</label>
+    <input type="text" id="regNome" class="inp" placeholder="Ex: João">
+
+    <label class="label">Senha</label>
+    <input type="password" id="regSenha" class="inp" placeholder="Mínimo 4 caracteres">
+
+    <label class="label">Plano</label>
+    <div class="planos-grid">
+      <div class="plano-btn sel" onclick="selPlano(this,'free')" id="pl-free">
+        <div class="plano-nome">Grátis</div>
+        <div class="plano-desc">1 usuário<br>100 vendas/mês</div>
+      </div>
+      <div class="plano-btn" onclick="selPlano(this,'basico')" id="pl-basico">
+        <div class="plano-nome" style="color:#60a5fa">Básico</div>
+        <div class="plano-desc">5 usuários<br>Ilimitado</div>
+      </div>
+      <div class="plano-btn" onclick="selPlano(this,'premium')" id="pl-premium">
+        <div class="plano-nome" style="color:#a78bfa">Premium</div>
+        <div class="plano-desc">Ilimitado<br>+ Relatórios</div>
+      </div>
+    </div>
+
+    <div id="regErr" class="msg-err"></div>
+    <button id="btnReg" class="btn-primary" onclick="registrar()">
+      <i class="fas fa-rocket"></i> Criar Empresa
+    </button>
+
+    <div id="regOk" style="display:none" class="msg-ok mt-3"></div>
+  </div>
+
+  <!-- ABA LOGIN -->
+  <div id="aba-login" style="display:none">
+    <label class="label">ID da empresa</label>
+    <input type="text" id="logEmpresaId" class="inp" placeholder="Ex: deposito_joao_ab12">
+
+    <label class="label">Usuário</label>
+    <input type="text" id="logNome" class="inp" placeholder="Seu nome">
+
+    <label class="label">Senha</label>
+    <input type="password" id="logSenha" class="inp" placeholder="Sua senha">
+
+    <div id="logErr" class="msg-err"></div>
+    <button class="btn-primary" onclick="entrar()">
+      <i class="fas fa-sign-in-alt"></i> Entrar
+    </button>
+  </div>
+
+  <!-- ABA CONVITE -->
+  <div id="aba-convite" style="display:none">
+    <label class="label">Código do convite</label>
+    <input type="text" id="convCodigo" class="inp" placeholder="Ex: AB12CD" maxlength="6"
+      style="text-transform:uppercase;letter-spacing:.2em;font-weight:800;font-size:1.1rem;text-align:center">
+
+    <label class="label">Seu nome</label>
+    <input type="text" id="convNome" class="inp" placeholder="Como quer ser chamado">
+
+    <label class="label">Senha</label>
+    <input type="password" id="convSenha" class="inp" placeholder="Mínimo 4 caracteres">
+
+    <div id="convErr" class="msg-err"></div>
+    <button class="btn-primary" onclick="usarConvite()">
+      <i class="fas fa-ticket-alt"></i> Usar Convite
+    </button>
+  </div>
+
+  <p class="link-small">
+    <a href="index.html">← Voltar ao sistema</a>
+  </p>
+</div>
+
+<script src="core.js"></script>
+<script src="./services/permissoesService.js"></script>
+<script src="./services/userService.js"></script>
+<script src="./services/saasService.js"></script>
+<script>
+'use strict';
+
+function _SS() { return window.CH && window.CH.SaasService; }
+
+let _plano = 'free';
+
+// Redireciona se já logado
+window.addEventListener('DOMContentLoaded', () => {
+  // Só redireciona se tem sessão SaaS ativa (SAAS_SESSION), não CH normal
+  const SS = _SS();
+  if (SS && SS.isLogged() && SS.getEmpresaId()) location.href = 'index.html';
+  else document.getElementById('regEmpresa')?.focus();
+});
+
+// ── ABAS ──────────────────────────────────────────────────────────
+function setAba(aba) {
+  ['registro','login','convite'].forEach(a => {
+    document.getElementById('aba-' + a).style.display = a === aba ? 'block' : 'none';
+    document.getElementById('tab-' + a).classList.toggle('on', a === aba);
+  });
+}
+
+// ── PLANO ─────────────────────────────────────────────────────────
+function selPlano(btn, plano) {
+  _plano = plano;
+  document.querySelectorAll('.plano-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+// ── REGISTRO ──────────────────────────────────────────────────────
+async function registrar() {
+  const SS    = _SS();
+  const btn   = document.getElementById('btnReg');
+  const err   = document.getElementById('regErr');
+  const ok    = document.getElementById('regOk');
+  err.textContent = '';
+  ok.style.display = 'none';
+
+  const nomeEmpresa   = document.getElementById('regEmpresa').value.trim();
+  const nomeUsuario   = document.getElementById('regNome').value.trim();
+  const senha         = document.getElementById('regSenha').value.trim();
+
+  if (!SS) { err.textContent = 'Serviço não carregado. Recarregue a página.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Criando…';
+
+  try {
+    const res = await SS.registrarEmpresa({ nomeEmpresa, nomeUsuario, senha, plano: _plano });
+    ok.style.display = 'block';
+    ok.innerHTML = `
+      ✅ Empresa criada!<br>
+      <span style="font-size:.65rem;color:#94a3b8;font-weight:600">Guarde seu ID de acesso:</span><br>
+      <div class="empresa-id-box" style="margin-top:.5rem">${res.empresaId}</div>
+      <a href="index.html" style="display:block;margin-top:.75rem;background:rgba(167,139,250,.15);color:#a78bfa;padding:.6rem;border-radius:.75rem;font-weight:800;font-size:.8rem">
+        Entrar no sistema →
+      </a>`;
+  } catch(e) {
+    err.textContent = e.message;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-rocket"></i> Criar Empresa';
+  }
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────
+async function entrar() {
+  const SS  = _SS();
+  const err = document.getElementById('logErr');
+  err.textContent = '';
+
+  const empresaId = document.getElementById('logEmpresaId').value.trim();
+  const nome      = document.getElementById('logNome').value.trim();
+  const senha     = document.getElementById('logSenha').value.trim();
+
+  if (!SS) { err.textContent = 'Serviço não carregado.'; return; }
+
+  try {
+    await SS.login(empresaId, nome, senha);
+    location.href = 'index.html';
+  } catch(e) {
+    err.textContent = e.message;
+  }
+}
+
+// ── CONVITE ───────────────────────────────────────────────────────
+async function usarConvite() {
+  const SS  = _SS();
+  const err = document.getElementById('convErr');
+  err.textContent = '';
+
+  const codigo = document.getElementById('convCodigo').value.trim().toUpperCase();
+  const nome   = document.getElementById('convNome').value.trim();
+  const senha  = document.getElementById('convSenha').value.trim();
+
+  if (!SS) { err.textContent = 'Serviço não carregado.'; return; }
+
+  try {
+    await SS.usarConvite({ codigo, nome, senha });
+    location.href = 'index.html';
+  } catch(e) {
+    err.textContent = e.message;
+  }
+}
+
+// Enter em cada campo da aba correta
+document.getElementById('regSenha').addEventListener('keydown',   e => { if (e.key==='Enter') registrar(); });
+document.getElementById('logSenha').addEventListener('keydown',   e => { if (e.key==='Enter') entrar(); });
+document.getElementById('convSenha').addEventListener('keydown',  e => { if (e.key==='Enter') usarConvite(); });
+document.getElementById('regNome').addEventListener('keydown',    e => { if (e.key==='Enter') document.getElementById('regSenha').focus(); });
+document.getElementById('logNome').addEventListener('keydown',    e => { if (e.key==='Enter') document.getElementById('logSenha').focus(); });
+document.getElementById('convCodigo').addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('convNome').focus(); });
+document.getElementById('convNome').addEventListener('keydown',   e => { if (e.key==='Enter') document.getElementById('convSenha').focus(); });
+</script>
+</body>
+</html>

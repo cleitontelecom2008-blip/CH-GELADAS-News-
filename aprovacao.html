@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#04060d">
+<title><span data-wl="nomeEmpresa">CH Geladas</span> — Aprovação de Vendas</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root { --bg:#04060d; --card:rgba(12,16,26,.95); }
+* { box-sizing: border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:#e2e8f0; min-height:100vh; }
+
+/* ── TOPBAR ── */
+.topbar { display:flex; align-items:center; gap:.75rem; padding:.875rem 1rem; background:rgba(12,16,26,.9); border-bottom:1px solid rgba(255,255,255,.06); position:sticky; top:0; z-index:50; }
+.topbar-title { font-family:'Syne',sans-serif; font-weight:700; font-size:1rem; }
+.topbar-back { color:#64748b; font-size:1.1rem; padding:.25rem; cursor:pointer; }
+
+/* ── TABS ── */
+.tab-bar { display:flex; gap:0; border-bottom:1px solid rgba(255,255,255,.07); background:rgba(12,16,26,.7); position:sticky; top:53px; z-index:40; overflow-x:auto; }
+.tab { flex:1; min-width:100px; padding:.65rem .5rem; text-align:center; font-size:.72rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#64748b; cursor:pointer; border-bottom:2px solid transparent; transition:.2s; white-space:nowrap; }
+.tab.active { color:#f59e0b; border-color:#f59e0b; }
+.tab .badge { display:inline-flex; align-items:center; justify-content:center; background:#ef4444; color:#fff; border-radius:999px; font-size:.6rem; font-weight:700; min-width:16px; height:16px; padding:0 4px; margin-left:4px; vertical-align:middle; }
+
+/* ── CARDS DE VENDA ── */
+.venda-card { background:var(--card); border:1px solid rgba(255,255,255,.06); border-radius:1rem; margin:.75rem 1rem; padding:.875rem 1rem; transition:.2s; }
+.venda-card:active { transform:scale(.99); }
+.venda-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.5rem; }
+.venda-operador { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.venda-hora { font-size:.65rem; color:#64748b; }
+.venda-total { font-family:'Syne',sans-serif; font-size:1.3rem; font-weight:800; color:#f1f5f9; }
+.venda-pgto { font-size:.7rem; color:#64748b; margin-top:.1rem; }
+.venda-itens { margin:.5rem 0; padding:.5rem .75rem; background:rgba(255,255,255,.03); border-radius:.5rem; }
+.venda-item { display:flex; justify-content:space-between; font-size:.75rem; color:#94a3b8; padding:.125rem 0; }
+.status-pill { display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .6rem; border-radius:999px; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+.s-pendente  { background:rgba(245,158,11,.15); color:#f59e0b; }
+.s-aprovada  { background:rgba(59,130,246,.15);  color:#60a5fa; }
+.s-validada  { background:rgba(16,185,129,.15);  color:#34d399; }
+.s-rejeitada { background:rgba(239,68,68,.15);   color:#f87171; }
+.s-concluida { background:rgba(100,116,139,.15); color:#94a3b8; }
+
+/* ── BOTÕES DE AÇÃO ── */
+.btn-row { display:flex; gap:.5rem; margin-top:.75rem; }
+.btn-act { flex:1; padding:.55rem .5rem; border-radius:.625rem; font-size:.72rem; font-weight:700; cursor:pointer; border:none; transition:.15s; text-transform:uppercase; letter-spacing:.04em; }
+.btn-aprovar  { background:rgba(59,130,246,.2);  color:#60a5fa;  border:1px solid rgba(59,130,246,.3); }
+.btn-aprovar:hover  { background:rgba(59,130,246,.35); }
+.btn-validar  { background:rgba(16,185,129,.2);  color:#34d399;  border:1px solid rgba(16,185,129,.3); }
+.btn-validar:hover  { background:rgba(16,185,129,.35); }
+.btn-rejeitar { background:rgba(239,68,68,.15);  color:#f87171;  border:1px solid rgba(239,68,68,.25); }
+.btn-rejeitar:hover { background:rgba(239,68,68,.3); }
+
+/* ── LOTE ── */
+.lote-bar { margin:.5rem 1rem; padding:.65rem 1rem; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.2); border-radius:.75rem; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+.lote-bar span { font-size:.75rem; color:#f59e0b; font-weight:600; }
+.btn-lote { padding:.45rem 1rem; border-radius:.5rem; font-size:.72rem; font-weight:700; cursor:pointer; border:none; background:rgba(245,158,11,.25); color:#f59e0b; white-space:nowrap; }
+
+/* ── EMPTY ── */
+.empty { text-align:center; padding:3rem 1.5rem; color:#475569; }
+.empty i { font-size:2rem; margin-bottom:.75rem; display:block; }
+.empty p { font-size:.85rem; }
+
+/* ── RESUMO TOPO ── */
+.resumo-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin:.75rem 1rem 0; }
+.resumo-item { background:rgba(12,16,26,.8); border:1px solid rgba(255,255,255,.06); border-radius:.75rem; padding:.65rem .875rem; }
+.resumo-label { font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin-bottom:.15rem; }
+.resumo-val { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; }
+
+/* ── TOAST ── */
+#toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(60px); background:rgba(20,25,40,.97); border:1px solid rgba(255,255,255,.1); border-radius:.875rem; padding:.65rem 1.25rem; font-size:.82rem; font-weight:500; white-space:nowrap; z-index:999; transition:.3s cubic-bezier(.34,1.56,.64,1); opacity:0; }
+#toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+#toast.ok  { border-color:rgba(16,185,129,.4); color:#34d399; }
+#toast.err { border-color:rgba(239,68,68,.4);  color:#f87171; }
+
+/* ── RASTREIO DIÁRIO ── */
+.rastreio-filtro { display:flex; gap:.5rem; margin:.75rem 1rem 0; overflow-x:auto; padding-bottom:.25rem; }
+.rastreio-filtro button { flex-shrink:0; padding:.35rem .85rem; border-radius:999px; font-size:.68rem; font-weight:700; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.04); color:#64748b; cursor:pointer; white-space:nowrap; transition:.2s; }
+.rastreio-filtro button.ativo { background:rgba(245,158,11,.18); border-color:rgba(245,158,11,.4); color:#f59e0b; }
+.usuario-bloco { margin:.75rem 1rem; background:rgba(12,16,26,.8); border:1px solid rgba(255,255,255,.07); border-radius:1rem; overflow:hidden; }
+.usuario-header { display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer; }
+.usuario-nome { font-family:'Syne',sans-serif; font-weight:700; font-size:.85rem; }
+.usuario-stats { display:flex; gap:.5rem; }
+.stat-chip { font-size:.62rem; font-weight:700; padding:.15rem .5rem; border-radius:999px; }
+.chip-apr  { background:rgba(59,130,246,.15);  color:#60a5fa; }
+.chip-val  { background:rgba(16,185,129,.15);  color:#34d399; }
+.chip-rej  { background:rgba(239,68,68,.15);   color:#f87171; }
+.chip-tot  { background:rgba(241,245,249,.08); color:#94a3b8; }
+.usuario-body { padding:.5rem 0; }
+.rastreio-venda { display:flex; align-items:flex-start; gap:.625rem; padding:.45rem 1rem; border-bottom:1px solid rgba(255,255,255,.04); }
+.rastreio-venda:last-child { border-bottom:none; }
+.rastreio-icon { width:1.75rem; height:1.75rem; border-radius:.5rem; display:flex; align-items:center; justify-content:center; font-size:.8rem; flex-shrink:0; margin-top:.1rem; }
+.ri-apr  { background:rgba(59,130,246,.15); }
+.ri-val  { background:rgba(16,185,129,.15); }
+.ri-rej  { background:rgba(239,68,68,.15); }
+.rastreio-info { flex:1; }
+.rastreio-titulo { font-size:.78rem; font-weight:600; color:#e2e8f0; }
+.rastreio-sub { font-size:.65rem; color:#64748b; margin-top:.1rem; }
+.rastreio-valor { font-family:'Syne',sans-serif; font-size:.82rem; font-weight:700; color:#f1f5f9; white-space:nowrap; }
+.rastreio-total-row { display:flex; justify-content:space-between; align-items:center; padding:.6rem 1rem; background:rgba(255,255,255,.02); border-top:1px solid rgba(255,255,255,.06); }
+.rastreio-total-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; }
+.rastreio-total-val { font-family:'Syne',sans-serif; font-size:.95rem; font-weight:800; color:#34d399; }
+.rastreio-vazio { text-align:center; padding:2.5rem 1rem; color:#475569; font-size:.8rem; }
+.rastreio-data-sel { display:flex; align-items:center; gap:.5rem; margin:.5rem 1rem 0; }
+.rastreio-data-sel label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:700; }
+.rastreio-data-sel input { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:.5rem; color:#e2e8f0; font-size:.8rem; padding:.3rem .6rem; outline:none; font-family:'DM Sans',sans-serif; }
+
+/* ── MODAL REJEIÇÃO ── */
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:200; display:none; align-items:flex-end; }
+.modal-bg.open { display:flex; }
+.modal-sheet { width:100%; background:rgba(12,16,26,.98); border-top:1px solid rgba(255,255,255,.08); border-radius:1.25rem 1.25rem 0 0; padding:1.25rem 1rem 2rem; }
+.modal-title { font-family:'Syne',sans-serif; font-weight:700; font-size:1rem; margin-bottom:.75rem; }
+.modal-input { width:100%; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:.625rem; padding:.625rem .875rem; color:#e2e8f0; font-size:.875rem; outline:none; resize:none; font-family:'DM Sans',sans-serif; }
+.modal-input:focus { border-color:rgba(239,68,68,.4); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-back" onclick="history.back()"><i class="fas fa-arrow-left"></i></span>
+  <span class="topbar-title">Aprovação de Vendas</span>
+  <span id="roleTag" style="margin-left:auto;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:.2rem .6rem;border-radius:999px;background:rgba(245,158,11,.15);color:#f59e0b;"></span>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <div class="tab active" data-tab="pendentes" onclick="switchTab('pendentes')">
+    Pendentes <span class="badge" id="badgePendentes" style="display:none"></span>
+  </div>
+  <div class="tab" data-tab="aprovadas" onclick="switchTab('aprovadas')">
+    Aprovadas <span class="badge" id="badgeAprovadas" style="display:none"></span>
+  </div>
+  <div class="tab" data-tab="validadas" onclick="switchTab('validadas')">Validadas</div>
+  <div class="tab" data-tab="rejeitadas" onclick="switchTab('rejeitadas')">Rejeitadas</div>
+  <div class="tab" data-tab="rastreio"   onclick="switchTab('rastreio')">📊 Rastreio</div>
+</div>
+
+<!-- RESUMO -->
+<div class="resumo-grid" id="resumoGrid"></div>
+
+<!-- BARRA DE LOTE -->
+<div id="loteBar" class="lote-bar" style="display:none">
+  <span id="loteLabel"></span>
+  <button class="btn-lote" id="loteBtn" onclick="acaoLote()"></button>
+</div>
+
+<!-- LISTA PRINCIPAL -->
+<div id="lista"></div>
+
+<!-- RASTREIO DIÁRIO -->
+<div id="rastreioContainer" style="display:none;padding-bottom:2rem">
+  <div class="rastreio-data-sel">
+    <label>📅 Data</label>
+    <input type="date" id="rastreioData" onchange="renderRastreio()">
+  </div>
+  <div class="rastreio-filtro" id="rastreioFiltros">
+    <button class="ativo" onclick="setFiltroRastreio('todos',this)">Todos</button>
+    <button onclick="setFiltroRastreio('aprovada',this)">Aprovações</button>
+    <button onclick="setFiltroRastreio('validada',this)">Validações</button>
+    <button onclick="setFiltroRastreio('rejeitada',this)">Rejeições</button>
+  </div>
+  <div id="rastreioLista"></div>
+</div>
+
+<!-- MODAL REJEIÇÃO -->
+<div class="modal-bg" id="modalRejeitar">
+  <div class="modal-sheet">
+    <div class="modal-title">Rejeitar Venda</div>
+    <p style="font-size:.78rem;color:#64748b;margin-bottom:.75rem">Informe o motivo (opcional):</p>
+    <textarea class="modal-input" id="motivoInput" rows="3" placeholder="Motivo da rejeição..."></textarea>
+    <div style="display:flex;gap:.75rem;margin-top:.875rem">
+      <button onclick="fecharModal()" style="flex:1;padding:.6rem;border-radius:.625rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;font-size:.8rem;font-weight:600;cursor:pointer">Cancelar</button>
+      <button onclick="confirmarRejeicao()" style="flex:1;padding:.6rem;border-radius:.625rem;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.8rem;font-weight:700;cursor:pointer">Rejeitar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script src="core.js"></script>
+<script src="./services/permissoesService.js"></script>
+<script src="./services/syncService.js"></script>
+<script src="./services/auditService.js"></script>
+<script src="./services/syncMonitor.js"></script>
+<script src="./services/backupService.js"></script>
+<script src="./services/userService.js"></script>
+<script src="./services/estoqueService.js"></script>
+<script src="./services/financeiroService.js"></script>
+<script src="./services/vendasService.js"></script>
+<script src="./services/aprovacaoService.js"></script>
+<script src="./services/featureFlagsService.js"></script>
+<script src="./services/soundService.js"></script>
+<script src="./services/whitelabelService.js"></script>
+
+<script>
+// AuthService, Utils, EventBus, Store vêm de core.js (escopo global)
+
+let _tabAtual    = 'pendentes';
+let _vendaRejeitar = null;
+let _role = '';
+let _temControle  = false;
+let _temValidacao = false;
+
+// ── AUTH GUARD ────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  if (!AuthService.isLogged()) { location.href = 'index.html'; return; }
+  _role = AuthService.getRole();
+  const roleEl = document.getElementById('roleTag');
+  if (roleEl) {
+    const info = window.CH.PermissoesService?.getPerfil(_role) || {};
+    roleEl.textContent = info.label || _role;
+    roleEl.style.color = info.cor || '#f59e0b';
+    roleEl.style.background = (info.cor || '#f59e0b') + '26';
+  }
+
+  // Verifica permissões
+  const isAdm  = ['adm','admin'].includes(_role);
+  const Perm   = window.CH.PermissoesService;
+  const US     = window.CH.UserService;
+  _temControle  = isAdm || (Perm && Perm.temAcesso(_role, 'aprovacao_controle'));
+  _temValidacao = isAdm || (Perm && Perm.temAcesso(_role, 'aprovacao_validacao'));
+
+  if (!_temControle && !_temValidacao) {
+    document.getElementById('lista').innerHTML = `
+      <div class="empty">
+        <i class="fas fa-lock"></i>
+        <p>Sem permissão para acessar este painel.<br>Contate o administrador.</p>
+      </div>`;
+    return;
+  }
+
+  // Inicializa Firebase
+  window.CH.FirebaseService.init().then(() => {
+    window.CH.FirebaseService.subscribeRealtime();
+    setTimeout(() => window.CH.SyncService.pull(), 500);
+  });
+
+  renderizar();
+  setInterval(renderizar, 15000);
+  EventBus.on('store:updated', () => {
+    // Ignora re-renders durante processamento em lote
+    if (!window.CH.AprovacaoService?.isProcessandoLote()) renderizar();
+  });
+  // Eventos de fim de lote — renderiza uma única vez
+  EventBus.on('venda:aprovada:lote',  renderizar);
+  EventBus.on('venda:validada:lote',  renderizar);
+  EventBus.on('venda:pendente', renderizar);
+  EventBus.on('venda:aprovada', renderizar);
+  EventBus.on('venda:validada', renderizar);
+  EventBus.on('venda:rejeitada', renderizar);
+});
+
+// ── TABS ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  _tabAtual = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  const isRastreio = tab === 'rastreio';
+  document.getElementById('lista').style.display             = isRastreio ? 'none' : '';
+  document.getElementById('resumoGrid').style.display        = isRastreio ? 'none' : '';
+  document.getElementById('loteBar').style.display           = 'none';
+  document.getElementById('rastreioContainer').style.display = isRastreio ? 'block' : 'none';
+  if (isRastreio) { _initRastreio(); }
+  else            { renderizar(); }
+}
+
+// ── RENDERIZAR ────────────────────────────────────────────────────
+function renderizar() {
+  _atualizarResumo();
+  _atualizarBadges();
+  _atualizarLotebar();
+
+  const Ap    = window.CH.AprovacaoService;
+  const lista = document.getElementById('lista');
+
+  let vendas = [];
+  if (_tabAtual === 'pendentes')  vendas = Ap.getPendentes();
+  if (_tabAtual === 'aprovadas')  vendas = Ap.getAprovadas();
+  if (_tabAtual === 'validadas')  vendas = Ap.getValidadas();
+  if (_tabAtual === 'rejeitadas') vendas = Ap.getRejeitadas();
+
+  if (!vendas.length) {
+    const msgs = {
+      pendentes:  'Nenhuma venda aguardando aprovação.',
+      aprovadas:  'Nenhuma venda aguardando validação.',
+      validadas:  'Nenhuma venda validada ainda.',
+      rejeitadas: 'Nenhuma venda rejeitada.',
+    };
+    lista.innerHTML = `<div class="empty"><i class="fas fa-check-circle"></i><p>${msgs[_tabAtual]}</p></div>`;
+    return;
+  }
+
+  lista.innerHTML = vendas.map(v => _cardHTML(v)).join('');
+}
+
+function _cardHTML(v) {
+  const itensHTML = (v.itens || []).map(i =>
+    `<div class="venda-item"><span>${i.qtd}x ${i.nome} (${i.label||'UNID'})</span><span>${_fmt(i.preco * i.qtd)}</span></div>`
+  ).join('');
+
+  const statusClass = {
+    pendente: 's-pendente', aprovada: 's-aprovada',
+    validada: 's-validada', rejeitada: 's-rejeitada', concluida: 's-concluida',
+  }[v.status] || 's-pendente';
+
+  const statusLabel = {
+    pendente: '⏳ Pendente', aprovada: '✅ Aprovada',
+    validada: '💚 Validada', rejeitada: '❌ Rejeitada',
+  }[v.status] || v.status;
+
+  let botoesHTML = '';
+
+  if (_tabAtual === 'pendentes' && _temControle) {
+    botoesHTML = `
+      <div class="btn-row">
+        <button class="btn-act btn-aprovar"  onclick="aprovar('${v.id}')"><i class="fas fa-check"></i> Aprovar</button>
+        <button class="btn-act btn-rejeitar" onclick="abrirRejeitar('${v.id}')"><i class="fas fa-times"></i> Rejeitar</button>
+      </div>`;
+  }
+
+  if (_tabAtual === 'aprovadas' && _temValidacao) {
+    botoesHTML = `
+      <div class="btn-row">
+        <button class="btn-act btn-validar"  onclick="validar('${v.id}')"><i class="fas fa-shield-alt"></i> Validar</button>
+        <button class="btn-act btn-rejeitar" onclick="abrirRejeitar('${v.id}')"><i class="fas fa-times"></i> Rejeitar</button>
+      </div>`;
+  }
+
+  const infoExtra = v.status === 'aprovada'
+    ? `<div style="font-size:.65rem;color:#64748b;margin-top:.4rem">Aprovada por <b style="color:#60a5fa">${v.aprovadaPor||''}</b></div>`
+    : v.status === 'validada'
+    ? `<div style="font-size:.65rem;color:#64748b;margin-top:.4rem">Validada por <b style="color:#34d399">${v.validadaPor||''}</b></div>`
+    : v.status === 'rejeitada' && v.motivoRejeicao
+    ? `<div style="font-size:.65rem;color:#f87171;margin-top:.4rem">Motivo: ${v.motivoRejeicao}</div>`
+    : '';
+
+  return `
+  <div class="venda-card">
+    <div class="venda-header">
+      <div>
+        <div class="venda-operador">🛒 ${v.operador}</div>
+        <div class="venda-hora">${v.hora} · ${v.data}</div>
+      </div>
+      <div><span class="status-pill ${statusClass}">${statusLabel}</span></div>
+    </div>
+    <div class="venda-total">${_fmt(v.total)}</div>
+    <div class="venda-pgto">${v.formaPgto}${v.desconto > 0 ? ` · Desconto: ${_fmt(v.desconto)}` : ''}</div>
+    <div class="venda-itens">${itensHTML || '<span style="font-size:.72rem;color:#475569">Sem itens</span>'}</div>
+    ${infoExtra}
+    ${botoesHTML}
+  </div>`;
+}
+
+// ── RESUMO ────────────────────────────────────────────────────────
+function _atualizarResumo() {
+  const Ap     = window.CH.AprovacaoService;
+  const todas  = Store.getVendas();
+  const hoje   = Utils.todayISO();
+  const hj     = todas.filter(v => v.dataCurta === hoje);
+
+  const pendentes  = hj.filter(v => v.status === 'pendente').length;
+  const aprovadas  = hj.filter(v => v.status === 'aprovada').length;
+  const validadas  = hj.filter(v => v.status === 'validada').length;
+  const totalVal   = hj.filter(v => ['validada','concluida'].includes(v.status))
+                       .reduce((s, v) => s + (v.total||0), 0);
+
+  document.getElementById('resumoGrid').innerHTML = `
+    <div class="resumo-item">
+      <div class="resumo-label">⏳ Pendentes hoje</div>
+      <div class="resumo-val" style="color:#f59e0b">${pendentes}</div>
+    </div>
+    <div class="resumo-item">
+      <div class="resumo-label">✅ Aprovadas</div>
+      <div class="resumo-val" style="color:#60a5fa">${aprovadas}</div>
+    </div>
+    <div class="resumo-item">
+      <div class="resumo-label">💚 Validadas hoje</div>
+      <div class="resumo-val" style="color:#34d399">${validadas}</div>
+    </div>
+    <div class="resumo-item">
+      <div class="resumo-label">💰 Total validado</div>
+      <div class="resumo-val" style="color:#f1f5f9;font-size:.9rem">${_fmt(totalVal)}</div>
+    </div>`;
+}
+
+function _atualizarBadges() {
+  const Ap = window.CH.AprovacaoService;
+  const pendentes = Ap.contarPendentes();
+  const aprovadas = Ap.contarAprovadas();
+
+  const bP = document.getElementById('badgePendentes');
+  const bA = document.getElementById('badgeAprovadas');
+  if (bP) { bP.textContent = pendentes; bP.style.display = pendentes ? 'inline-flex' : 'none'; }
+  if (bA) { bA.textContent = aprovadas; bA.style.display = aprovadas ? 'inline-flex' : 'none'; }
+}
+
+function _atualizarLotebar() {
+  const bar = document.getElementById('loteBar');
+  const Ap  = window.CH.AprovacaoService;
+
+  if (_tabAtual === 'pendentes' && _temControle) {
+    const n = Ap.contarPendentes();
+    if (n > 1) {
+      document.getElementById('loteLabel').textContent = `${n} vendas pendentes`;
+      document.getElementById('loteBtn').textContent   = 'Aprovar Todas';
+      bar.style.display = 'flex';
+      return;
+    }
+  }
+  if (_tabAtual === 'aprovadas' && _temValidacao) {
+    const n = Ap.contarAprovadas();
+    if (n > 1) {
+      document.getElementById('loteLabel').textContent = `${n} vendas aprovadas`;
+      document.getElementById('loteBtn').textContent   = 'Validar Todas';
+      bar.style.display = 'flex';
+      return;
+    }
+  }
+  bar.style.display = 'none';
+}
+
+// ── AÇÕES INDIVIDUAIS ─────────────────────────────────────────────
+async function aprovar(id) {
+  try {
+    await window.CH.AprovacaoService.aprovarVenda(id);
+    toast('Venda aprovada! Aguarda validação.', 'ok');
+    renderizar();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function validar(id) {
+  try {
+    await window.CH.AprovacaoService.validarVenda(id);
+    toast('Venda validada! Estoque e financeiro atualizados.', 'ok');
+    renderizar();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+function abrirRejeitar(id) {
+  _vendaRejeitar = id;
+  document.getElementById('motivoInput').value = '';
+  document.getElementById('modalRejeitar').classList.add('open');
+}
+
+function fecharModal() {
+  _vendaRejeitar = null;
+  document.getElementById('modalRejeitar').classList.remove('open');
+}
+
+async function confirmarRejeicao() {
+  if (!_vendaRejeitar) return;
+  const motivo = document.getElementById('motivoInput').value.trim();
+  try {
+    await window.CH.AprovacaoService.rejeitarVenda(_vendaRejeitar, motivo);
+    fecharModal();
+    toast('Venda rejeitada.', 'ok');
+    renderizar();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ── AÇÃO EM LOTE ──────────────────────────────────────────────────
+async function acaoLote() {
+  const Ap  = window.CH.AprovacaoService;
+  const btn = document.getElementById('loteBtn');
+  if (btn.disabled) return;              // guard duplo clique
+  btn.disabled = true;
+  btn.textContent = 'Processando…';
+  try {
+    if (_tabAtual === 'pendentes') {
+      const r = await Ap.aprovarTodas();
+      toast(r.total ? `${r.total} venda(s) aprovada(s)!` : 'Nenhuma pendente', 'ok');
+    } else if (_tabAtual === 'aprovadas') {
+      const r = await Ap.validarTodas();
+      toast(r.total ? `${r.total} venda(s) validada(s)!` : 'Nenhuma aprovada', 'ok');
+    }
+  } catch(e) {
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    renderizar();  // re-renderiza UMA vez no final
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+function _fmt(v) {
+  return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)||0);
+}
+
+let _toastTimer;
+function toast(msg, tipo = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show ' + tipo;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+
+
+// ── RASTREIO DIÁRIO ───────────────────────────────────────────────
+let _filtroRastreio = 'todos';
+let _blocoExpandido = null;
+
+function _initRastreio() {
+  const inp = document.getElementById('rastreioData');
+  if (!inp.value) inp.value = Utils.todayISO();
+  renderRastreio();
+}
+
+function setFiltroRastreio(tipo, btn) {
+  _filtroRastreio = tipo;
+  document.querySelectorAll('.rastreio-filtro button').forEach(b => b.classList.remove('ativo'));
+  btn.classList.add('ativo');
+  renderRastreio();
+}
+
+function _toggleBloco(userId) {
+  const body = document.getElementById('rbody_' + userId);
+  const icon = document.getElementById('ricon_' + userId);
+  if (!body) return;
+  const aberto = body.style.display !== 'none';
+  body.style.display = aberto ? 'none' : 'block';
+  if (icon) icon.style.transform = aberto ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function renderRastreio() {
+  const data  = document.getElementById('rastreioData').value;
+  if (!data) return;
+  const todas = Store.getVendas();
+
+  // Seleciona vendas do dia que tiveram alguma ação de aprovação
+  const vendas = todas.filter(v => {
+    const dApr = v.aprovadaEm  ? v.aprovadaEm.slice(0,10)  : null;
+    const dVal = v.validadaEm  ? v.validadaEm.slice(0,10)  : null;
+    const dRej = v.rejeitadaEm ? v.rejeitadaEm.slice(0,10) : null;
+    return dApr === data || dVal === data || dRej === data;
+  });
+
+  // Monta linhas de rastreio: cada venda pode gerar múltiplas ações
+  const acoes = [];
+  for (const v of vendas) {
+    if (v.aprovadaEm && v.aprovadaEm.slice(0,10) === data) {
+      acoes.push({ vendaId:v.id, tipo:'aprovada',  por: v.aprovadaPor  || '?', em: v.aprovadaEm,  total: v.total, operador: v.operador });
+    }
+    if (v.validadaEm && v.validadaEm.slice(0,10) === data) {
+      acoes.push({ vendaId:v.id, tipo:'validada',  por: v.validadaPor  || '?', em: v.validadaEm,  total: v.total, operador: v.operador });
+    }
+    if (v.rejeitadaEm && v.rejeitadaEm.slice(0,10) === data) {
+      acoes.push({ vendaId:v.id, tipo:'rejeitada', por: v.rejeitadaPor || '?', em: v.rejeitadaEm, total: v.total, operador: v.operador, motivo: v.motivoRejeicao });
+    }
+  }
+
+  // Filtra por tipo se necessário
+  const filtradas = _filtroRastreio === 'todos' ? acoes : acoes.filter(a => a.tipo === _filtroRastreio);
+
+  // Agrupa por usuário (quem executou a ação)
+  const porUsuario = {};
+  for (const a of filtradas) {
+    if (!porUsuario[a.por]) porUsuario[a.por] = [];
+    porUsuario[a.por].push(a);
+  }
+
+  const lista = document.getElementById('rastreioLista');
+  const usuarios = Object.keys(porUsuario);
+
+  if (!usuarios.length) {
+    lista.innerHTML = '<div class="rastreio-vazio"><p>Nenhuma ação de aprovação registrada para esta data.</p></div>';
+    return;
+  }
+
+  lista.innerHTML = usuarios.map(u => {
+    const itens   = porUsuario[u].sort((a,b) => (a.em||'').localeCompare(b.em||''));
+    const nApr    = itens.filter(i => i.tipo === 'aprovada').length;
+    const nVal    = itens.filter(i => i.tipo === 'validada').length;
+    const nRej    = itens.filter(i => i.tipo === 'rejeitada').length;
+    const totalVal = itens.filter(i => i.tipo === 'validada').reduce((s,i) => s + (i.total||0), 0);
+    const userId  = u.replace(/[^a-z0-9]/gi,'_');
+
+    const chips = [
+      nApr ? `<span class="stat-chip chip-apr">✅ ${nApr} apr</span>` : '',
+      nVal ? `<span class="stat-chip chip-val">💚 ${nVal} val</span>` : '',
+      nRej ? `<span class="stat-chip chip-rej">❌ ${nRej} rej</span>` : '',
+    ].filter(Boolean).join('');
+
+    const linhas = itens.map(a => {
+      const hora = a.em ? a.em.slice(11,16) : '--:--';
+      const cfg = {
+        aprovada:  { icon:'✅', cls:'ri-apr', label:'Aprovou venda de' },
+        validada:  { icon:'💚', cls:'ri-val', label:'Validou venda de' },
+        rejeitada: { icon:'❌', cls:'ri-rej', label:'Rejeitou venda de' },
+      }[a.tipo] || {};
+      const motivo = a.motivo ? `<br>Motivo: ${a.motivo}` : '';
+      return `
+        <div class="rastreio-venda">
+          <div class="rastreio-icon ${cfg.cls}">${cfg.icon}</div>
+          <div class="rastreio-info">
+            <div class="rastreio-titulo">${cfg.label} <b>${a.operador||'?'}</b></div>
+            <div class="rastreio-sub">${hora}${motivo}</div>
+          </div>
+          <div class="rastreio-valor">${_fmt(a.total||0)}</div>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="usuario-bloco">
+      <div class="usuario-header" onclick="_toggleBloco('${userId}')">
+        <div>
+          <div class="usuario-nome">👤 ${u}</div>
+          <div class="usuario-stats" style="margin-top:.25rem">${chips}</div>
+        </div>
+        <i id="ricon_${userId}" class="fas fa-chevron-down" style="color:#475569;font-size:.75rem;transition:.2s"></i>
+      </div>
+      <div id="rbody_${userId}" class="usuario-body">
+        ${linhas}
+        ${totalVal > 0 ? `
+        <div class="rastreio-total-row">
+          <span class="rastreio-total-label">Total validado</span>
+          <span class="rastreio-total-val">${_fmt(totalVal)}</span>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Fecha modal ao clicar fora
+document.getElementById('modalRejeitar').addEventListener('click', e => {
+  if (e.target === e.currentTarget) fecharModal();
+});
+</script>
+</body>
+</html>

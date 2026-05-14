@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard BI — <span data-wl="nomeEmpresa">CH Geladas</span></title>
+<meta name="theme-color" content="#0f172a">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  /* ── Reset + Tokens ──────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f172a;
+    --surface:  #1e293b;
+    --border:   #334155;
+    --text:     #f1f5f9;
+    --muted:    #94a3b8;
+    --accent:   #60a5fa;
+    --green:    #10b981;
+    --yellow:   #f59e0b;
+    --red:      #ef4444;
+    --purple:   #a78bfa;
+    --radius:   12px;
+    --gap:      16px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ──────────────────────────────────────────────────── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .header-brand h1 { font-size: 1.1rem; font-weight: 700; }
+  .header-brand span { font-size: .75rem; color: var(--muted); }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .btn { padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: .85rem; font-weight: 600; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-sm { padding: 5px 10px; font-size: .78rem; }
+
+  /* ── Period selector ─────────────────────────────────────────── */
+  .period-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .period-bar label { font-size: .8rem; color: var(--muted); }
+  .period-bar input[type="date"] {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 10px; border-radius: 8px;
+    font-size: .85rem;
+  }
+  .period-pills { display: flex; gap: 6px; margin-left: auto; }
+  .pill {
+    padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer;
+    font-size: .78rem; font-weight: 600; transition: all .15s;
+  }
+  .pill.active, .pill:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ── Main layout ─────────────────────────────────────────────── */
+  .main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── Alerts ──────────────────────────────────────────────────── */
+  .alerts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .alert {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 8px; font-size: .85rem; font-weight: 500;
+  }
+  .alert-critical { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+  .alert-warning   { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.3); color: #fcd34d; }
+  .alert-info      { background: rgba(96,165,250,.1);  border: 1px solid rgba(96,165,250,.25); color: #93c5fd; }
+
+  /* ── KPI Grid ────────────────────────────────────────────────── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--gap);
+    margin-bottom: var(--gap);
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .kpi.blue::before   { background: var(--accent); }
+  .kpi.green::before  { background: var(--green); }
+  .kpi.yellow::before { background: var(--yellow); }
+  .kpi.purple::before { background: var(--purple); }
+  .kpi.red::before    { background: var(--red); }
+
+  .kpi-label  { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .kpi-value  { font-size: 1.55rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .kpi-sub    { font-size: .75rem; color: var(--muted); }
+  .kpi-delta  { font-size: .78rem; font-weight: 700; margin-top: 4px; }
+  .kpi-delta.up   { color: var(--green); }
+  .kpi-delta.down { color: var(--red); }
+  .kpi-delta.neu  { color: var(--muted); }
+
+  /* ── Charts grid ─────────────────────────────────────────────── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+    margin-bottom: var(--gap);
+  }
+  @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title {
+    font-size: .9rem; font-weight: 700; margin-bottom: 4px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .chart-subtitle { font-size: .75rem; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 240px; }
+  .chart-wrap.tall { height: 320px; }
+
+  /* ── ABC Table ────────────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+  th {
+    text-align: left; padding: 9px 12px;
+    background: rgba(255,255,255,.04);
+    color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.03); }
+
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 6px;
+    font-size: .7rem; font-weight: 800;
+  }
+  .badge-A { background: rgba(16,185,129,.2); color: #34d399; }
+  .badge-B { background: rgba(245,158,11,.2); color: #fcd34d; }
+  .badge-C { background: rgba(100,116,139,.2); color: #94a3b8; }
+
+  .bar-inline {
+    display: inline-block;
+    height: 6px; border-radius: 3px; background: var(--accent);
+    vertical-align: middle; margin-right: 6px;
+  }
+
+  /* ── Parados table ────────────────────────────────────────────── */
+  .chip {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: .7rem; font-weight: 700;
+  }
+  .chip-red    { background: rgba(239,68,68,.15);   color: #fca5a5; }
+  .chip-orange { background: rgba(245,158,11,.15);  color: #fcd34d; }
+  .chip-blue   { background: rgba(96,165,250,.15);  color: #93c5fd; }
+  .chip-gray   { background: rgba(100,116,139,.15); color: #94a3b8; }
+
+  /* ── Horários pico ────────────────────────────────────────────── */
+  .heatmap {
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    gap: 3px;
+    margin-top: 12px;
+  }
+  @media (max-width: 700px) { .heatmap { grid-template-columns: repeat(12, 1fr); } }
+  .heat-cell {
+    aspect-ratio: 1; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .55rem; color: rgba(255,255,255,.6);
+    cursor: default; transition: transform .1s;
+  }
+  .heat-cell:hover { transform: scale(1.15); }
+
+  /* ── Comparativo ─────────────────────────────────────────────── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .compare-item { background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px; }
+  .compare-label { font-size: .7rem; color: var(--muted); margin-bottom: 4px; }
+  .compare-val { font-size: 1rem; font-weight: 700; }
+  .compare-delta { font-size: .72rem; margin-top: 2px; }
+
+  /* ── Tabs ────────────────────────────────────────────────────── */
+  .tabs { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 10px 18px; cursor: pointer; font-size: .88rem; font-weight: 600;
+    color: var(--muted); border-bottom: 2px solid transparent;
+    transition: all .15s; background: none; border-top: none; border-left: none; border-right: none;
+  }
+  .tab:hover  { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Login ────────────────────────────────────────────────────── */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  .login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 36px; width: 320px; text-align: center;
+  }
+  .login-box h2 { font-size: 1.3rem; margin-bottom: 6px; }
+  .login-box p  { font-size: .85rem; color: var(--muted); margin-bottom: 24px; }
+  .pin-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;
+  }
+  .pin-btn {
+    aspect-ratio: 1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; font-size: 1.2rem; font-weight: 700; color: var(--text);
+    cursor: pointer; transition: all .1s;
+  }
+  .pin-btn:hover { background: var(--border); }
+  .pin-btn:active { transform: scale(.94); }
+  .pin-display {
+    font-size: 1.5rem; letter-spacing: .3em; margin-bottom: 16px; min-height: 2rem; color: var(--accent);
+  }
+  .login-err { color: var(--red); font-size: .82rem; margin-top: 8px; }
+
+  /* ── Loader ────────────────────────────────────────────────────── */
+  #loader {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999; font-size: .9rem; color: var(--muted);
+    flex-direction: column; gap: 12px;
+  }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Misc ─────────────────────────────────────────────────────── */
+  .section-title {
+    font-size: .8rem; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .08em;
+    margin: 20px 0 12px;
+  }
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: .88rem; }
+  .text-right  { text-align: right; }
+  .text-mono   { font-family: monospace; }
+  .fw7 { font-weight: 700; }
+  .c-green  { color: var(--green); }
+  .c-red    { color: var(--red); }
+  .c-yellow { color: var(--yellow); }
+  .c-muted  { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ── Loader ──────────────────────────────────────────────────── -->
+<div id="loader">
+  <div class="spinner"></div>
+  <span>Carregando serviços…</span>
+</div>
+
+<!-- ── Login ──────────────────────────────────────────────────── -->
+<div id="login-screen" style="display:none">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:12px">📊</div>
+    <h2>Dashboard BI</h2>
+    <p>Acesso restrito — insira o PIN</p>
+    <div class="pin-display" id="pin-display">·  ·  ·  ·</div>
+    <div class="pin-grid">
+      <button class="pin-btn" data-v="1">1</button>
+      <button class="pin-btn" data-v="2">2</button>
+      <button class="pin-btn" data-v="3">3</button>
+      <button class="pin-btn" data-v="4">4</button>
+      <button class="pin-btn" data-v="5">5</button>
+      <button class="pin-btn" data-v="6">6</button>
+      <button class="pin-btn" data-v="7">7</button>
+      <button class="pin-btn" data-v="8">8</button>
+      <button class="pin-btn" data-v="9">9</button>
+      <button class="pin-btn" data-v="←" style="font-size:.9rem">←</button>
+      <button class="pin-btn" data-v="0">0</button>
+      <button class="pin-btn" data-v="✓" style="background:var(--accent);border-color:var(--accent)">✓</button>
+    </div>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── App ─────────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <span style="font-size:1.4rem">📊</span>
+      <div>
+        <h1>Dashboard BI</h1>
+        <span id="header-plano">CH Geladas</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="last-update" class="c-muted" style="font-size:.75rem"></span>
+      <button class="btn btn-outline btn-sm" onclick="renderAll()">↻ Atualizar</button>
+      <button class="btn btn-outline btn-sm" onclick="location.href='index.html'">← Início</button>
+    </div>
+  </header>
+
+  <!-- Period Bar -->
+  <div class="period-bar">
+    <label>De</label>
+    <input type="date" id="date-de">
+    <label>Até</label>
+    <input type="date" id="date-ate">
+    <button class="btn btn-primary btn-sm" onclick="aplicarPeriodo()">Aplicar</button>
+    <div class="period-pills">
+      <button class="pill" onclick="setPeriodo(7)">7d</button>
+      <button class="pill active" onclick="setPeriodo(30)">30d</button>
+      <button class="pill" onclick="setPeriodo(90)">90d</button>
+      <button class="pill" onclick="setPeriodoMes()">Mês</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div id="alerts-container" class="alerts"></div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('visao-geral')">Visão Geral</button>
+      <button class="tab" onclick="switchTab('abc')">Curva ABC</button>
+      <button class="tab" onclick="switchTab('financeiro')">Financeiro</button>
+      <button class="tab" onclick="switchTab('produtos')">Produtos</button>
+      <button class="tab" onclick="switchTab('tempo')">Tempo</button>
+      <button class="tab" onclick="switchTab('parados')">Parados</button>
+    </div>
+
+    <!-- Tab: Visão Geral -->
+    <div id="tab-visao-geral" class="tab-content active">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Receita × Custo × Lucro</div>
+          <div class="chart-subtitle" id="sub-rcl"></div>
+          <div class="chart-wrap"><canvas id="chart-rcl"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Formas de Pagamento</div>
+          <div class="chart-subtitle">Distribuição de receita por forma</div>
+          <div class="chart-wrap"><canvas id="chart-pgto"></canvas></div>
+        </div>
+        <div class="chart-card full">
+          <div class="chart-title">Fluxo de Caixa</div>
+          <div class="chart-subtitle" id="sub-fluxo">Receita diária no período</div>
+          <div class="chart-wrap tall"><canvas id="chart-fluxo"></canvas></div>
+        </div>
+      </div>
+      <div class="section-title">Comparativo Mês Atual × Anterior</div>
+      <div class="chart-card">
+        <div class="compare-grid" id="compare-grid"></div>
+      </div>
+    </div>
+
+    <!-- Tab: ABC -->
+    <div id="tab-abc" class="tab-content">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Participação por Classe</div>
+          <div class="chart-subtitle">Percentual de faturamento A/B/C</div>
+          <div class="chart-wrap"><canvas id="chart-abc-pie"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Resumo ABC</div>
+          <div class="chart-subtitle">Produtos e receita por classe</div>
+          <div id="abc-summary" style="margin-top:20px"></div>
+        </div>
+      </div>
+      <div class="section-title">Tabela Curva ABC</div>
+      <div class="chart-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Classe</th><th>Produto</th><th>Categoria</th>
+                <th class="text-right">Qtd</th>
+                <th class="text-right">Receita</th>
+                <th class="text-right">Margem</th>
+                <th class="text-right">% Total</th>
+                <th class="text-right">% Acum.</th>
+              </tr>
+            </thead>
+            <tbody id="abc-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Financeiro -->
+    <div id="tab-financeiro" class="tab-content">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">CMV — Custo de Mercadoria Vendida</div>
+          <div class="chart-subtitle">Composição da receita bruta</div>
+          <div class="chart-wrap"><canvas id="chart-cmv"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Lucro por Categoria</div>
+          <div class="chart-subtitle">Margem e lucro por segmento</div>
+          <div class="chart-wrap"><canvas id="chart-cat"></canvas></div>
+        </div>
+      </div>
+      <div class="section-title">Detalhe por Categoria</div>
+      <div class="chart-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Categoria</th>
+                <th class="text-right">Qtd Itens</th>
+                <th class="text-right">Receita</th>
+                <th class="text-right">CMV</th>
+                <th class="text-right">Lucro</th>
+                <th class="text-right">Margem</th>
+                <th class="text-right">Participação</th>
+              </tr>
+            </thead>
+            <tbody id="cat-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Produtos -->
+    <div id="tab-produtos" class="tab-content">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Top 10 por Receita</div>
+          <div class="chart-subtitle">Produtos mais rentáveis</div>
+          <div class="chart-wrap tall"><canvas id="chart-top-receita"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Top 10 por Quantidade</div>
+          <div class="chart-subtitle">Produtos mais vendidos em unidades</div>
+          <div class="chart-wrap tall"><canvas id="chart-top-qtd"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Tempo -->
+    <div id="tab-tempo" class="tab-content">
+      <div class="charts-grid">
+        <div class="chart-card full">
+          <div class="chart-title">Vendas por Hora do Dia</div>
+          <div class="chart-subtitle" id="sub-pico">Quantidade de vendas por hora</div>
+          <div class="chart-wrap tall"><canvas id="chart-hora"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Vendas por Dia da Semana</div>
+          <div class="chart-subtitle">Quantidade de transações</div>
+          <div class="chart-wrap"><canvas id="chart-dow"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Mapa de Calor — Horários</div>
+          <div class="chart-subtitle">Intensidade de vendas por hora (0–23h)</div>
+          <div id="heatmap-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Parados -->
+    <div id="tab-parados" class="tab-content">
+      <div class="section-title" id="parados-title"></div>
+      <div class="chart-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Produto</th><th>Categoria</th>
+                <th class="text-right">Estoque</th>
+                <th class="text-right">Capital Parado</th>
+                <th class="text-right">Última Venda</th>
+                <th class="text-right">Dias Parado</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="parados-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── Scripts ──────────────────────────────────────────────────── -->
+<script src="core.js"></script>
+<script src="services/auditService.js"></script>
+<script src="services/permissoesService.js"></script>
+<script src="services/userService.js"></script>
+<script src="services/syncService.js"></script>
+<script src="services/estoqueService.js"></script>
+<script src="services/vendasService.js"></script>
+<script src="services/financeiroService.js"></script>
+<script src="services/biService.js"></script>
+<script src="services/featureFlagsService.js"></script>
+<script src="services/soundService.js"></script>
+<script src="services/whitelabelService.js"></script>
+<script src="services/filialService.js"></script>
+<script src="services/billingService.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   BI Dashboard — Controller
+   ═══════════════════════════════════════════════════════════════════ */
+'use strict';
+
+// ── Estado ─────────────────────────────────────────────────────────
+let _de  = _diasAtras(30);
+let _ate = hj();
+const _charts = {};
+
+// ── Período helpers ─────────────────────────────────────────────────
+function hj()         { return new Date().toISOString().slice(0,10); }
+function _diasAtras(n){ const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10); }
+function _mesAtualDe(){ const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`; }
+
+function setPeriodo(d) {
+  _de  = _diasAtras(d);
+  _ate = hj();
+  _syncInputs();
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  renderAll();
+}
+function setPeriodoMes() {
+  _de  = _mesAtualDe();
+  _ate = hj();
+  _syncInputs();
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  renderAll();
+}
+function aplicarPeriodo() {
+  _de  = document.getElementById('date-de').value  || _de;
+  _ate = document.getElementById('date-ate').value || _ate;
+  renderAll();
+}
+function _syncInputs() {
+  document.getElementById('date-de').value  = _de;
+  document.getElementById('date-ate').value = _ate;
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${id}`)?.classList.add('active');
+  event.target.classList.add('active');
+  // Lazy render específico por tab
+  if (id === 'abc')        renderABC();
+  if (id === 'financeiro') renderFinanceiro();
+  if (id === 'produtos')   renderProdutos();
+  if (id === 'tempo')      renderTempo();
+  if (id === 'parados')    renderParados();
+}
+
+// ── Formatação ──────────────────────────────────────────────────────
+const fmt = v => 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtN = v => (Number(v)||0).toLocaleString('pt-BR');
+const fmtPct = v => (Number(v)||0).toFixed(1) + '%';
+const deltaHtml = (v, pct = true) => {
+  if (v === null || v === undefined || isNaN(v)) return '<span class="c-muted">—</span>';
+  const s = pct ? fmtPct(Math.abs(v)) : fmtN(Math.abs(v));
+  const arrow = v >= 0 ? '▲' : '▼';
+  const cls   = v >= 0 ? 'c-green' : 'c-red';
+  return `<span class="${cls}">${arrow} ${s}</span>`;
+};
+
+// ── Destruir chart existente ────────────────────────────────────────
+function _chart(id, config) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  _charts[id] = new Chart(canvas.getContext('2d'), config);
+  return _charts[id];
+}
+
+// ── Cores do tema ───────────────────────────────────────────────────
+const COLORS = ['#60a5fa','#10b981','#f59e0b','#a78bfa','#f472b6','#34d399','#fb923c','#38bdf8'];
+const gridColor  = 'rgba(255,255,255,.06)';
+const tickColor  = '#94a3b8';
+const baseOpts   = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: tickColor, font: {size:10} }, grid: { color: gridColor } },
+    y: { ticks: { color: tickColor, font: {size:10} }, grid: { color: gridColor } },
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  RENDER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+function renderKPIs(dash) {
+  const { hoje, mes, financeiro, estoque } = dash;
+  const comp = dash.comparativo;
+
+  const kpis = [
+    {
+      label: 'Receita Hoje', value: fmt(hoje.receita), sub: `${fmtN(hoje.vendas)} vendas`,
+      delta: null, classe: 'blue',
+    },
+    {
+      label: 'Lucro Hoje', value: fmt(hoje.lucro),
+      sub: `Margem: ${fmtPct(hoje.margem)}`, delta: null, classe: 'green',
+    },
+    {
+      label: 'Receita Mês', value: fmt(mes.receita),
+      sub: `${fmtN(mes.vendas)} vendas`,
+      delta: comp.variacao.receita, classe: 'blue',
+    },
+    {
+      label: 'Ticket Médio', value: fmt(financeiro.ticketMedio),
+      sub: 'No período', delta: comp.variacao.ticket, classe: 'yellow',
+    },
+    {
+      label: 'Margem Real', value: fmtPct(mes.margem),
+      sub: mes.margem >= 30 ? '✓ Saudável' : '⚠ Atenção', delta: null,
+      classe: mes.margem >= 30 ? 'green' : 'yellow',
+    },
+    {
+      label: 'CMV',  value: fmt(mes.cmv),
+      sub: `${fmtPct(mes.receita > 0 ? (mes.cmv/mes.receita)*100 : 0)} da receita`,
+      delta: null, classe: 'purple',
+    },
+    {
+      label: 'Estoque Baixo', value: estoque.baixo,
+      sub: `${estoque.zerado} zerado(s)`, delta: null,
+      classe: estoque.zerado > 0 ? 'red' : estoque.baixo > 3 ? 'yellow' : 'green',
+    },
+    {
+      label: 'Capital Parado', value: fmt(financeiro.capitalParado),
+      sub: `${financeiro.produtosParados} produto(s)`, delta: null, classe: 'purple',
+    },
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k => `
+    <div class="kpi ${k.classe}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      ${k.delta !== null ? `<div class="kpi-delta">${deltaHtml(k.delta)} vs mês ant.</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderAlertas(alertas) {
+  const el = document.getElementById('alerts-container');
+  if (!alertas?.length) { el.innerHTML = ''; return; }
+  el.innerHTML = alertas.map(a => `
+    <div class="alert alert-${a.tipo}">
+      <span>${a.icone}</span> ${a.msg}
+    </div>
+  `).join('');
+}
+
+function renderVisaoGeral(dash) {
+  const BI = window.CH.BIService;
+
+  // Receita × Custo × Lucro
+  const cmv = BI.getCMV(_de, _ate);
+  document.getElementById('sub-rcl').textContent = `${_de} → ${_ate}`;
+  _chart('chart-rcl', {
+    type: 'doughnut',
+    data: {
+      labels:   ['Lucro Bruto', 'CMV (Custo)', 'Outros'],
+      datasets: [{ data: [cmv.margemBruta, cmv.cmv, 0], backgroundColor: ['#10b981','#ef4444','#94a3b8'], borderWidth: 0 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#cbd5e1' } },
+        tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.raw)} (${fmtPct(cmv.receita>0?ctx.raw/cmv.receita*100:0)})` } },
+      },
+    },
+  });
+
+  // Formas de pagamento
+  const tkt = BI.getTicketMedio(_de, _ate);
+  const formas = Object.entries(tkt.porForma || {});
+  _chart('chart-pgto', {
+    type: 'pie',
+    data: {
+      labels:   formas.map(([k]) => k),
+      datasets: [{ data: formas.map(([,v]) => v.total), backgroundColor: COLORS, borderWidth: 0 }],
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#cbd5e1' } } } },
+  });
+
+  // Fluxo de caixa
+  const fluxo = BI.getFluxoCaixaPeriodo(_de, _ate);
+  _chart('chart-fluxo', {
+    type: 'bar',
+    data: {
+      labels:   fluxo.map(d => d.data.slice(5)),
+      datasets: [
+        { label:'Receita', data: fluxo.map(d => d.receitas||0), backgroundColor:'rgba(96,165,250,.7)', borderRadius:4 },
+      ],
+    },
+    options: { ...baseOpts, plugins: { ...baseOpts.plugins, legend:{ display:false } } },
+  });
+
+  // Comparativo
+  const comp = dash.comparativo;
+  const fmtLabel = p => `${p.de.slice(5,7)}/${p.de.slice(0,4)}`;
+  document.getElementById('compare-grid').innerHTML = [
+    { label:'Receita', atual: fmt(comp.atual.receita), ant: fmt(comp.anterior.receita), delta: comp.variacao.receita },
+    { label:'Lucro',   atual: fmt(comp.atual.lucro),   ant: fmt(comp.anterior.lucro),   delta: comp.variacao.lucro },
+    { label:'Vendas',  atual: fmtN(comp.atual.qtd),    ant: fmtN(comp.anterior.qtd),    delta: comp.variacao.qtd,  pct:false },
+    { label:'Ticket',  atual: fmt(comp.atual.ticket),  ant: fmt(comp.anterior.ticket),  delta: comp.variacao.ticket },
+  ].map(item => `
+    <div class="compare-item">
+      <div class="compare-label">${item.label}</div>
+      <div class="compare-val">${item.atual}</div>
+      <div class="compare-delta c-muted" style="font-size:.7rem">${fmtLabel(comp.anterior.periodo)}: ${item.ant}</div>
+      <div class="compare-delta">${deltaHtml(item.delta, item.pct !== false)}</div>
+    </div>
+  `).join('');
+}
+
+function renderABC() {
+  const BI  = window.CH.BIService;
+  const abc = BI.getCurvaABC(90);
+
+  // Pie
+  _chart('chart-abc-pie', {
+    type: 'doughnut',
+    data: {
+      labels:   ['Classe A','Classe B','Classe C'],
+      datasets: [{ data: ['A','B','C'].map(c => abc.resumo[c].receita), backgroundColor:['#10b981','#f59e0b','#94a3b8'], borderWidth:0 }],
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#cbd5e1' } } } },
+  });
+
+  // Resumo ABC
+  document.getElementById('abc-summary').innerHTML = ['A','B','C'].map(cls => {
+    const r = abc.resumo[cls];
+    const cor = cls==='A'?'#34d399':cls==='B'?'#fcd34d':'#94a3b8';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <span class="badge badge-${cls}">${cls}</span>
+        <div style="flex:1">
+          <div style="font-weight:700;color:${cor}">${r.count} produto(s)</div>
+          <div style="font-size:.75rem;color:var(--muted)">${fmtPct(r.percentualReceita)} da receita</div>
+        </div>
+        <div style="font-weight:700">${fmt(r.receita)}</div>
+      </div>`;
+  }).join('');
+
+  // Tabela
+  const max = abc.lista[0]?.percentual || 1;
+  document.getElementById('abc-tbody').innerHTML = abc.lista.map((p, i) => `
+    <tr>
+      <td class="c-muted text-mono">${i+1}</td>
+      <td><span class="badge badge-${p.classe}">${p.classe}</span></td>
+      <td class="fw7">${p.nome}</td>
+      <td class="c-muted">${p.categoria||'—'}</td>
+      <td class="text-right">${fmtN(p.qtd)}</td>
+      <td class="text-right fw7">${fmt(p.receita)}</td>
+      <td class="text-right ${p.margem>=30?'c-green':p.margem>=15?'c-yellow':'c-red'}">${fmtPct(p.margem)}</td>
+      <td class="text-right">
+        <span class="bar-inline" style="width:${Math.round(p.percentual/max*60)}px"></span>
+        ${fmtPct(p.percentual)}
+      </td>
+      <td class="text-right c-muted">${fmtPct(p.acumulado)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" class="empty-state">Sem dados no período.</td></tr>';
+}
+
+function renderFinanceiro() {
+  const BI  = window.CH.BIService;
+  const cmv = BI.getCMV(_de, _ate);
+  const cat = BI.getLucroPorCategoria(_de, _ate);
+
+  // CMV doughnut
+  _chart('chart-cmv', {
+    type: 'doughnut',
+    data: {
+      labels:   ['Margem Bruta', 'CMV'],
+      datasets: [{ data:[cmv.margemBruta, cmv.cmv], backgroundColor:['#10b981','#ef4444'], borderWidth:0 }],
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:'#cbd5e1'}},
+        tooltip:{callbacks:{label:ctx=>`${fmt(ctx.raw)} (${fmtPct(cmv.receita>0?ctx.raw/cmv.receita*100:0)})`}},
+      },
+    },
+  });
+
+  // Lucro por categoria (bar horizontal)
+  _chart('chart-cat', {
+    type: 'bar',
+    data: {
+      labels:   cat.lista.map(c => c.categoria),
+      datasets: [
+        { label:'Lucro',  data:cat.lista.map(c=>c.lucro),   backgroundColor:'rgba(16,185,129,.7)', borderRadius:4 },
+        { label:'Custo',  data:cat.lista.map(c=>c.custo),   backgroundColor:'rgba(239,68,68,.5)',  borderRadius:4 },
+      ],
+    },
+    options: { ...baseOpts, indexAxis:'y', plugins:{...baseOpts.plugins} },
+  });
+
+  // Tabela categorias
+  document.getElementById('cat-tbody').innerHTML = cat.lista.map(c => `
+    <tr>
+      <td class="fw7">${c.categoria}</td>
+      <td class="text-right">${fmtN(c.qtd)}</td>
+      <td class="text-right">${fmt(c.receita)}</td>
+      <td class="text-right c-red">${fmt(c.custo)}</td>
+      <td class="text-right c-green fw7">${fmt(c.lucro)}</td>
+      <td class="text-right ${c.margem>=30?'c-green':c.margem>=15?'c-yellow':'c-red'}">${fmtPct(c.margem)}</td>
+      <td class="text-right">
+        <span class="bar-inline" style="width:${Math.round(c.participacao*.6)}px"></span>
+        ${fmtPct(c.participacao)}
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" class="empty-state">Sem dados.</td></tr>';
+}
+
+function renderProdutos() {
+  const BI  = window.CH.BIService;
+  const rnk = BI.getRankingProdutos(10, _de, _ate);
+
+  function _bar(id, lista, campo, label, cor) {
+    _chart(id, {
+      type:'bar',
+      data:{
+        labels: lista.map(p => p.nome.slice(0,20)),
+        datasets:[{ label, data:lista.map(p=>p[campo]), backgroundColor:cor, borderRadius:4 }],
+      },
+      options:{
+        ...baseOpts, indexAxis:'y',
+        plugins:{...baseOpts.plugins, legend:{display:false}},
+      },
+    });
+  }
+  _bar('chart-top-receita', rnk.porReceita, 'receita', 'Receita (R$)', 'rgba(96,165,250,.75)');
+  _bar('chart-top-qtd',     rnk.porQtd,    'qtd',     'Quantidade',   'rgba(16,185,129,.75)');
+}
+
+function renderTempo() {
+  const BI   = window.CH.BIService;
+  const pico = BI.getHorariosPico(_de, _ate);
+
+  // Por hora
+  const picoSet = new Set(pico.picos);
+  _chart('chart-hora', {
+    type:'bar',
+    data:{
+      labels: pico.porHora.map(h=>h.label),
+      datasets:[{
+        label:'Vendas',
+        data:  pico.porHora.map(h=>h.qtdVendas),
+        backgroundColor: pico.porHora.map(h => picoSet.has(h.hora) ? '#f59e0b' : 'rgba(96,165,250,.6)'),
+        borderRadius:4,
+      }],
+    },
+    options:{...baseOpts, plugins:{...baseOpts.plugins, legend:{display:false}}},
+  });
+
+  // Por dia da semana
+  _chart('chart-dow', {
+    type:'bar',
+    data:{
+      labels: pico.porDiaSemana.map(d=>d.label),
+      datasets:[{ label:'Vendas', data: pico.porDiaSemana.map(d=>d.qtdVendas), backgroundColor:'rgba(167,139,250,.7)', borderRadius:4 }],
+    },
+    options:{...baseOpts, plugins:{...baseOpts.plugins, legend:{display:false}}},
+  });
+
+  // Heatmap
+  const maxH = Math.max(...pico.porHora.map(h=>h.qtdVendas), 1);
+  document.getElementById('heatmap-wrap').innerHTML = `
+    <div class="heatmap">
+      ${pico.porHora.map(h => {
+        const intensity = h.qtdVendas / maxH;
+        const alpha     = (0.08 + intensity * 0.85).toFixed(2);
+        const color     = picoSet.has(h.hora)
+          ? `rgba(245,158,11,${alpha})`
+          : `rgba(96,165,250,${alpha})`;
+        return `<div class="heat-cell" style="background:${color}" title="${h.label}: ${h.qtdVendas} vendas">${h.hora}</div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:.7rem;color:var(--muted);margin-top:8px">
+      🟡 = horário de pico &nbsp; 🔵 = normal
+    </div>`;
+
+  document.getElementById('sub-pico').textContent =
+    pico.picos.length ? `Picos: ${pico.picos.map(h=>h+'h').join(', ')}` : 'Sem dados';
+}
+
+function renderParados() {
+  const BI  = window.CH.BIService;
+  const par = BI.getProdutosParados(30);
+
+  document.getElementById('parados-title').textContent =
+    `${par.total} produto(s) parado(s) — Capital imobilizado: ${fmt(par.capitalParado)}`;
+
+  const gravLabel = { nunca_vendeu:'Nunca vendeu', critico:'Crítico +90d', alto:'Alto +60d', moderado:'Moderado' };
+  const gravCls   = { nunca_vendeu:'chip-gray', critico:'chip-red', alto:'chip-orange', moderado:'chip-blue' };
+
+  document.getElementById('parados-tbody').innerHTML = par.lista.map(p => `
+    <tr>
+      <td class="fw7">${p.nome}</td>
+      <td class="c-muted">${p.categoria||'—'}</td>
+      <td class="text-right">${fmtN(p.qtdEstoque)}</td>
+      <td class="text-right c-yellow">${fmt(p.custoEstoque)}</td>
+      <td class="text-right c-muted">${p.ultimaVenda || '—'}</td>
+      <td class="text-right">${p.diasParado !== null ? p.diasParado+'d' : '—'}</td>
+      <td><span class="chip ${gravCls[p.gravidade]}">${gravLabel[p.gravidade]}</span></td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" class="empty-state">Nenhum produto parado! 🎉</td></tr>';
+}
+
+// ── Render principal ─────────────────────────────────────────────────
+function renderAll() {
+  const BI = window.CH?.BIService;
+  if (!BI) { console.warn('[BI] BIService não disponível'); return; }
+
+  const dash = BI.getDashboardExecutivo();
+  renderKPIs(dash);
+  renderAlertas(dash.alertas);
+  renderVisaoGeral(dash);
+
+  // Render da tab ativa
+  const tabAtiva = document.querySelector('.tab-content.active')?.id?.replace('tab-','');
+  if (tabAtiva === 'abc')        renderABC();
+  if (tabAtiva === 'financeiro') renderFinanceiro();
+  if (tabAtiva === 'produtos')   renderProdutos();
+  if (tabAtiva === 'tempo')      renderTempo();
+  if (tabAtiva === 'parados')    renderParados();
+
+  document.getElementById('last-update').textContent =
+    'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+
+  // Info de plano
+  const plano = window.CH?.FeatureFlags?.planoAtual?.() || '';
+  const planoLabel = { free:'Grátis', basico:'Básico', premium:'Premium', enterprise:'Enterprise', _standalone:'Standalone' };
+  document.getElementById('header-plano').textContent =
+    `CH Geladas${plano && plano !== '_standalone' ? ' · ' + (planoLabel[plano]||plano) : ''}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  AUTH + BOOT
+// ═══════════════════════════════════════════════════════════════════
+
+let _pin = '';
+
+function setupLogin() {
+  document.querySelectorAll('.pin-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.v;
+      if (v === '←') {
+        _pin = _pin.slice(0, -1);
+      } else if (v === '✓') {
+        _tentarLogin();
+      } else {
+        if (_pin.length < 6) _pin += v;
+      }
+      _atualizarPinDisplay();
+    });
+  });
+}
+
+function _atualizarPinDisplay() {
+  const filled = '●'.repeat(_pin.length);
+  const empty  = '·  '.repeat(Math.max(0, 4 - _pin.length)).trim();
+  document.getElementById('pin-display').textContent = filled + (empty ? '  ' + empty : '');
+}
+
+async function _tentarLogin() {
+  if (!_pin) return;
+  try {
+    const role = await window.CH.AuthService.login(_pin);
+    if (role && ['admin','adm','gerente','analista','validador'].includes(role)) {
+      _mostrarApp();
+    } else if (role) {
+      document.getElementById('login-err').textContent = 'Acesso restrito a admin/gerente/analista.';
+      _pin = ''; _atualizarPinDisplay();
+    } else {
+      document.getElementById('login-err').textContent = 'PIN incorreto.';
+      _pin = ''; _atualizarPinDisplay();
+    }
+  } catch (e) {
+    document.getElementById('login-err').textContent = 'Erro: ' + e.message;
+    _pin = ''; _atualizarPinDisplay();
+  }
+}
+
+function _mostrarApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  _syncInputs();
+  renderAll();
+}
+
+// ── Keyboard ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (document.getElementById('login-screen').style.display !== 'none') {
+    if (e.key >= '0' && e.key <= '9' && _pin.length < 6) { _pin += e.key; _atualizarPinDisplay(); }
+    if (e.key === 'Backspace') { _pin = _pin.slice(0,-1); _atualizarPinDisplay(); }
+    if (e.key === 'Enter') _tentarLogin();
+  } else {
+    if (e.key === 'r' && !e.ctrlKey) renderAll();
+  }
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────
+async function boot() {
+  const loader = document.getElementById('loader');
+  try {
+    // Aguarda CH estar disponível
+    await new Promise(resolve => {
+      if (window.CH?.AuthService) return resolve();
+      window.addEventListener('load', resolve);
+    });
+
+    // Tenta iniciar Firebase em background
+    window.CH?.FirebaseService?.init?.().catch(() => {});
+
+    // Checa se já autenticado
+    const role = window.CH?.AuthService?.getRole?.();
+    if (role && ['admin','adm','gerente','analista','validador'].includes(role)) {
+      loader.style.display = 'none';
+      _mostrarApp();
+      return;
+    }
+
+    loader.style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    setupLogin();
+    _syncInputs();
+  } catch (e) {
+    loader.innerHTML = `<div>Erro ao carregar: ${e.message}</div><br><a href="index.html" style="color:var(--accent)">← Voltar</a>`;
+  }
+}
+
+// Aguarda todos os scripts carregarem
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#04060d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CH Geladas">
+<title>Fiado — CH Geladas</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+:root{--bg:#060810;--border:rgba(255,255,255,0.06);}
+*{box-sizing:border-box;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:#f1f5f9;min-height:100vh;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+body{background-image:radial-gradient(ellipse at 20% 80%,rgba(239,68,68,.04) 0%,transparent 50%);}
+
+#lock{position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 40%,#0f1a2e 0%,#060810 70%);display:flex;align-items:center;justify-content:center;}
+#lock.hidden{display:none;}
+
+.modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.8);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility .2s;}
+.modal.open{opacity:1;visibility:visible;pointer-events:auto;}
+.modal.open>.modal-box{animation:mIn .22s cubic-bezier(.34,1.56,.64,1) forwards;}
+@keyframes mIn{from{opacity:0;transform:scale(.93) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-box{background:rgba(13,17,23,.98);border:1px solid rgba(255,255,255,.09);border-radius:2rem;width:100%;box-shadow:0 32px 64px rgba(0,0,0,.6);}
+
+.inp{font-size:16px!important;padding:12px 14px;color:#fff;background:#1e293b;border:2px solid #334155;border-radius:.75rem;width:100%;outline:none;transition:all .2s;font-family:inherit;}
+.inp:focus{border-color:#ef4444!important;box-shadow:0 0 0 4px rgba(239,68,68,.2)!important;background:#0f172a;}
+.inp::placeholder{color:#64748b;}
+.label{color:#f87171;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem;display:block;}
+
+/* CLIENTE CARD */
+.cli-card{background:rgba(13,17,23,.85);border:1px solid rgba(255,255,255,.07);border-radius:1.5rem;padding:1.25rem;transition:all .2s;cursor:pointer;position:relative;overflow:hidden;}
+.cli-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:4px 0 0 4px;}
+.cli-card.devendo::before{background:#ef4444;}
+.cli-card.quitado::before{background:#10b981;}
+.cli-card.bloqueado::before{background:#6b7280;}
+.cli-card:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.12);}
+
+/* DETALHE */
+.movim-row{background:rgba(13,17,23,.7);border:1px solid rgba(255,255,255,.05);border-radius:1rem;padding:.75rem;display:flex;align-items:center;gap:.75rem;}
+
+.badge{display:inline-flex;align-items:center;border-radius:9999px;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:.2rem .55rem;}
+.b-red{background:rgba(239,68,68,.15);color:#f87171;}
+.b-green{background:rgba(16,185,129,.15);color:#34d399;}
+.b-blue{background:rgba(59,130,246,.15);color:#60a5fa;}
+.b-amber{background:rgba(245,158,11,.15);color:#fbbf24;}
+.b-slate{background:rgba(100,116,139,.15);color:#94a3b8;}
+
+.scroll::-webkit-scrollbar{width:3px;}
+.scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:10px;}
+.no-scroll{-ms-overflow-style:none;scrollbar-width:none;}
+.no-scroll::-webkit-scrollbar{display:none;}
+
+#toast{min-width:220px;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(4rem);opacity:0;pointer-events:none;z-index:200;transition:opacity .25s,transform .25s;background:rgba(13,17,23,.98);border:1px solid rgba(255,255,255,.09);border-radius:1.25rem;padding:1rem 1.25rem;display:flex;align-items:center;gap:.75rem;box-shadow:0 24px 48px rgba(0,0,0,.5);}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.vista{display:none;}
+.vista.ativa{display:block;}
+.adm-only{display:none!important;}
+body.is-admin .adm-only{display:flex!important;}
+
+/* ── RASTREIO FIADO ── */
+.rastreio-tabs { display:flex; gap:.375rem; padding:.75rem 1rem .25rem; border-bottom:1px solid rgba(255,255,255,.05); }
+.rastreio-tab  { flex:1; text-align:center; font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; padding:.5rem; border-radius:.625rem; cursor:pointer; transition:.2s; color:#475569; }
+.rastreio-tab.on { background:rgba(239,68,68,.12); color:#f87171; }
+.compra-bloco  { margin:.75rem 1rem .25rem; background:rgba(15,23,42,.8); border:1px solid rgba(255,255,255,.07); border-radius:1rem; overflow:hidden; }
+.compra-header { display:flex; justify-content:space-between; align-items:flex-start; padding:.7rem .875rem; background:rgba(255,255,255,.03); cursor:pointer; }
+.compra-data   { font-size:.7rem; font-weight:700; color:#e2e8f0; }
+.compra-hora   { font-size:.6rem; color:#64748b; margin-top:.1rem; }
+.compra-total  { font-family:'Syne',sans-serif; font-weight:800; font-size:.85rem; color:#f1f5f9; }
+.compra-status { font-size:.58rem; font-weight:700; padding:.15rem .45rem; border-radius:999px; margin-top:.25rem; text-align:right; }
+.cs-pend  { background:rgba(245,158,11,.12); color:#f59e0b; }
+.cs-apr   { background:rgba(59,130,246,.12);  color:#60a5fa; }
+.cs-ok    { background:rgba(16,185,129,.12);  color:#34d399; }
+.cs-rej   { background:rgba(239,68,68,.12);   color:#f87171; }
+.compra-itens  { padding:.375rem .875rem .625rem; }
+.compra-item   { display:flex; justify-content:space-between; align-items:center; padding:.3rem 0; border-bottom:1px solid rgba(255,255,255,.04); font-size:.72rem; }
+.compra-item:last-child { border-bottom:none; }
+.ci-nome { color:#cbd5e1; }
+.ci-qtd  { font-size:.6rem; color:#64748b; margin-top:.05rem; }
+.ci-val  { font-family:'Syne',sans-serif; font-weight:700; color:#94a3b8; font-size:.72rem; }
+.compra-vazio  { text-align:center; padding:2.5rem 1rem; color:#475569; font-size:.78rem; }
+.compra-resumo { display:flex; justify-content:space-between; padding:.5rem .875rem; background:rgba(255,255,255,.02); border-top:1px solid rgba(255,255,255,.05); }
+.cr-label { font-size:.6rem; text-transform:uppercase; letter-spacing:.06em; color:#475569; }
+.cr-val   { font-family:'Syne',sans-serif; font-weight:800; font-size:.8rem; color:#34d399; }
+
+/* ── PARCELAS ── */
+.parcela-header { font-size:.62rem; text-transform:uppercase; letter-spacing:.08em; color:#64748b; font-weight:700; margin-bottom:.5rem; display:flex; justify-content:space-between; }
+.parcela-barra-wrap { height:.5rem; background:#1e293b; border-radius:999px; overflow:hidden; margin:.5rem 0; }
+.parcela-barra { height:100%; background:linear-gradient(90deg,#10b981,#34d399); border-radius:999px; transition:.4s; }
+.parcela-chip { display:inline-flex; align-items:center; gap:.3rem; font-size:.62rem; font-weight:700; padding:.2rem .55rem; border-radius:999px; }
+.chip-pend-fiado { background:rgba(239,68,68,.12); color:#f87171; }
+.chip-parc-fiado { background:rgba(245,158,11,.12); color:#f59e0b; }
+.chip-quit-fiado { background:rgba(16,185,129,.12); color:#34d399; }
+.parcela-item { display:flex; align-items:center; justify-content:space-between; padding:.45rem 0; border-bottom:1px solid rgba(255,255,255,.05); font-size:.75rem; }
+.parcela-item:last-child { border-bottom:none; }
+.baixa-tag { font-size:.58rem; font-weight:700; padding:.1rem .4rem; border-radius:999px; background:rgba(59,130,246,.12); color:#60a5fa; }
+.modal-parcela .modal-box { max-width:26rem; }
+
+</style>
+</head>
+<body>
+
+<!-- LOCK -->
+<div id="lock">
+  <div style="background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.08);border-radius:2.5rem;padding:2.5rem;width:100%;max-width:360px;margin:0 1rem;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8);">
+    <div class="text-5xl mb-4">🤝</div>
+    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight"><span data-wl="nomeEmpresa">CH GELADAS</span></h1>
+    <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-8">Módulo de Fiado</p>
+    <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
+    <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
+    <div id="lockError" class="hidden text-[10px] text-red-400 font-bold mb-3"></div>
+    <button onclick="doLogin()" class="w-full bg-red-700 hover:bg-red-600 py-4 rounded-xl font-black uppercase text-xs tracking-widest transition-all">
+      <i class="fas fa-unlock-alt mr-2"></i>Entrar
+    </button>
+    <div class="mt-6"><a href="index.html" class="text-[9px] text-slate-700 hover:text-slate-500 font-bold uppercase tracking-widest transition-colors">← Hub Principal</a></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden flex flex-col min-h-screen">
+
+  <header class="sticky top-0 z-40 px-4 py-3 flex justify-between items-center" style="background:rgba(6,8,16,.96);border-bottom:1px solid rgba(255,255,255,.04);">
+    <div class="flex items-center gap-3">
+      <button id="btnVoltar" onclick="voltarLista()" class="hidden w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-all">
+        <i class="fas fa-arrow-left text-xs"></i>
+      </button>
+      <span class="text-2xl">🤝</span>
+      <div>
+        <h1 id="headerTitulo" class="text-[10px] font-black uppercase tracking-widest text-red-400"><span data-wl="nomeApp">Fiado</span></h1>
+        <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="btnRelatorio" onclick="abrirRelatorio()" class="w-8 h-8 rounded-lg bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500 hover:text-red-400 transition-all">
+        <i class="fas fa-chart-bar text-xs"></i>
+      </button>
+      <button id="btnNovoCliente" onclick="abrirFormCliente()" class="bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-wide transition-all flex items-center gap-1.5">
+        <i class="fas fa-user-plus text-[9px]"></i>Cliente
+      </button>
+      <button onclick="logout()" class="w-8 h-8 rounded-lg bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500 hover:text-red-400 transition-all">
+        <i class="fas fa-power-off text-xs"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- VISTA LISTA -->
+  <div id="vistaLista" class="vista ativa flex-1 p-3 pb-28">
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-3 gap-2 mb-3">
+      <div class="bg-red-500/8 border border-red-500/15 rounded-2xl p-3 text-center">
+        <p class="text-[8px] text-red-400 font-black uppercase tracking-wider mb-1">Total Devido</p>
+        <p id="kpiTotal" class="text-lg font-black text-red-300">R$ 0,00</p>
+      </div>
+      <div class="bg-slate-900/50 border border-white/5 rounded-2xl p-3 text-center">
+        <p class="text-[8px] text-slate-400 font-black uppercase tracking-wider mb-1">Clientes</p>
+        <p id="kpiClientes" class="text-lg font-black text-white">0</p>
+      </div>
+      <div class="bg-amber-500/8 border border-amber-500/15 rounded-2xl p-3 text-center">
+        <p class="text-[8px] text-amber-400 font-black uppercase tracking-wider mb-1">Bloqueados</p>
+        <p id="kpiBloqueados" class="text-lg font-black text-amber-300">0</p>
+      </div>
+    </div>
+
+    <!-- Busca -->
+    <div class="relative mb-3">
+      <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+      <input type="text" id="buscaCliente" oninput="renderClientes()" class="inp !pl-9 !py-2.5" placeholder="Buscar cliente...">
+    </div>
+
+    <!-- Lista de clientes -->
+    <div id="listaClientes" class="grid md:grid-cols-2 gap-3"></div>
+  </div>
+
+  <!-- VISTA DETALHE CLIENTE -->
+  <div id="vistaDetalhe" class="vista flex-1 p-3 pb-28 space-y-3">
+    <!-- Info do cliente -->
+    <div class="bg-slate-900/50 border border-white/5 rounded-3xl p-5">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <p id="detNome"   class="text-xl font-black text-white"></p>
+          <p id="detTel"    class="text-[9px] text-slate-500 font-bold mt-0.5"></p>
+          <p id="detLimite" class="text-[9px] text-amber-400 font-bold mt-0.5"></p>
+        </div>
+        <div class="text-right">
+          <p class="text-[8px] text-slate-500 font-black uppercase">Saldo Devedor</p>
+          <p id="detSaldo" class="text-3xl font-black text-red-400">R$ 0,00</p>
+          <span id="detStatus" class="badge b-red mt-1">Devendo</span>
+        </div>
+      </div>
+      <!-- Ações rápidas -->
+      <div class="grid grid-cols-3 gap-2">
+        <button onclick="abrirLancarFiado()" class="py-3 rounded-2xl bg-red-600/20 border border-red-500/25 text-red-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-red-600/35">
+          <i class="fas fa-plus text-base"></i>Lançar
+        </button>
+        <button onclick="abrirReceberPgto()" class="py-3 rounded-2xl bg-emerald-600/20 border border-emerald-500/25 text-emerald-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-emerald-600/35">
+          <i class="fas fa-hand-holding-usd text-base"></i>Receber
+        </button>
+        <button onclick="abrirParcela()" class="py-3 rounded-2xl bg-amber-600/20 border border-amber-500/25 text-amber-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-amber-600/35">
+          <i class="fas fa-layer-group text-base"></i>Parcelas
+        </button>
+        <button onclick="editarCliente()" class="py-3 rounded-2xl bg-slate-800 border border-white/5 text-slate-400 font-black text-[9px] uppercase flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-slate-700">
+          <i class="fas fa-cog text-base"></i>Config
+        </button>
+        <button onclick="zerarSaldoCliente()" class="adm-only py-3 rounded-2xl bg-amber-600/20 border border-amber-500/25 text-amber-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-amber-600/35">
+          <i class="fas fa-eraser text-base"></i>Zerar
+        </button>
+      </div>
+    </div>
+
+    <!-- Histórico de movimentações -->
+    <div>
+      <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-2 px-1">Histórico</p>
+      <div id="detHistorico" class="space-y-2 max-h-80 overflow-y-auto scroll"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL FORM CLIENTE ══════ -->
+<div id="modalCliente" class="modal">
+  <div class="modal-box max-w-sm p-8">
+    <h3 id="formCliTitulo" class="text-sm font-black text-red-400 mb-6 flex items-center gap-2"><i class="fas fa-user"></i> Novo Cliente</h3>
+    <input type="hidden" id="fCliId">
+    <div class="space-y-4">
+      <div>
+        <label class="label">Nome <span class="text-red-500">*</span></label>
+        <input type="text" id="fCliNome" class="inp" placeholder="Nome do cliente">
+      </div>
+      <div>
+        <label class="label">Telefone</label>
+        <input type="tel" id="fCliTel" class="inp" placeholder="(71) 9 9999-9999">
+      </div>
+      <div>
+        <label class="label">Limite de Crédito (R$)</label>
+        <input type="number" id="fCliLimite" class="inp" placeholder="Ex: 100.00" step="0.01" min="0">
+        <p class="text-[8px] text-slate-600 font-bold mt-1">Deixe 0 para sem limite</p>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="salvarCliente()" class="flex-1 bg-red-700 hover:bg-red-600 py-3.5 rounded-xl font-black uppercase text-xs text-white transition-all">
+        <i class="fas fa-save mr-1"></i>Salvar
+      </button>
+      <button onclick="UIService.closeModal('modalCliente')" class="bg-slate-800 px-5 rounded-xl font-black uppercase text-xs text-slate-400">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL LANÇAR FIADO ══════ -->
+<div id="modalLancar" class="modal">
+  <div class="modal-box max-w-sm p-8">
+    <h3 class="text-sm font-black text-red-400 mb-6 flex items-center gap-2"><i class="fas fa-plus-circle"></i> Lançar Fiado</h3>
+    <p id="lancarNome" class="text-[10px] text-slate-400 font-bold uppercase mb-4"></p>
+    <div class="space-y-4">
+      <div>
+        <label class="label">Valor (R$) <span class="text-red-500">*</span></label>
+        <input type="number" id="fLancarValor" class="inp text-xl font-black" placeholder="0,00" step="0.01" min="0.01">
+      </div>
+      <div>
+        <label class="label">Descrição</label>
+        <input type="text" id="fLancarDesc" class="inp" placeholder="Ex: Cerveja Skol, Refrigerante...">
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="confirmarLancamento()" class="flex-1 bg-red-700 hover:bg-red-600 py-3.5 rounded-xl font-black uppercase text-xs text-white transition-all">
+        <i class="fas fa-plus mr-1"></i>Lançar
+      </button>
+      <button onclick="UIService.closeModal('modalLancar')" class="bg-slate-800 px-5 rounded-xl font-black uppercase text-xs text-slate-400">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL RECEBER PAGAMENTO ══════ -->
+<!-- ══════ MODAL PAGAMENTO PARCIAL ══════ -->
+<div id="modalParcela" class="modal modal-parcela">
+  <div class="modal-box max-w-sm p-6">
+    <h3 class="text-sm font-black text-amber-400 mb-1 flex items-center gap-2">
+      <i class="fas fa-layer-group"></i> Pagamento por Etapas
+    </h3>
+    <p id="parcelaNome"    class="text-[10px] text-slate-400 font-bold uppercase mb-1"></p>
+    <p id="parcelaTotal"   class="text-[9px] text-slate-500 font-bold mb-1"></p>
+    <p id="parcelaJaPago"  class="text-[9px] text-emerald-400 font-bold mb-1"></p>
+    <p id="parcelaSaldo"   class="text-[9px] text-red-400 font-bold mb-3"></p>
+
+    <!-- Barra de progresso -->
+    <div class="parcela-barra-wrap mb-4">
+      <div id="parcelaBarra" class="parcela-barra" style="width:0%"></div>
+    </div>
+
+    <!-- Histórico de parcelas pagas -->
+    <div id="parcelaHistorico" class="mb-4" style="max-height:120px;overflow-y:auto"></div>
+
+    <!-- Itens e baixa de estoque -->
+    <div id="parcelaItensWrap" class="mb-4" style="display:none">
+      <div class="parcela-header"><span>📦 Itens liberados nesta parcela</span></div>
+      <div id="parcelaItens" class="text-xs text-slate-400 space-y-1"></div>
+    </div>
+
+    <!-- Valor a pagar agora -->
+    <div class="mb-3">
+      <label class="label !text-amber-400">Valor a pagar agora (R$)</label>
+      <input type="number" id="fParcelaValor" class="inp text-xl font-black"
+        placeholder="0,00" step="0.01" min="0.01"
+        oninput="_parcelaPreview()">
+    </div>
+
+    <!-- Atalhos -->
+    <div class="grid grid-cols-3 gap-2 mb-3">
+      <button onclick="_parcelaSetValor('total')"  class="py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-black text-[9px] uppercase hover:bg-emerald-500/20">Total</button>
+      <button onclick="_parcelaSetValor('metade')" class="py-2 rounded-xl bg-amber-500/10  border border-amber-500/20  text-amber-300  font-black text-[9px] uppercase hover:bg-amber-500/20">Metade</button>
+      <button onclick="_parcelaSetValor('tercao')" class="py-2 rounded-xl bg-slate-800      border border-white/5      text-slate-400  font-black text-[9px] uppercase hover:bg-slate-700">1/3</button>
+    </div>
+
+    <!-- Preview baixa de estoque -->
+    <div id="parcelaPreviewBaixa" class="mb-3 hidden text-[10px] text-blue-400 font-semibold bg-blue-900/20 border border-blue-500/20 rounded-xl p-2">
+      📦 Baixará estoque proporcional ao valor pago
+    </div>
+
+    <!-- Forma de pagamento -->
+    <label class="label !text-amber-400">Forma de Pagamento</label>
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <button onclick="confirmarParcela('Dinheiro')" class="py-3 rounded-xl bg-emerald-600/20 border border-emerald-500/25 text-emerald-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 hover:bg-emerald-600/35 transition-all"><i class="fas fa-money-bill-wave text-base"></i>Dinheiro</button>
+      <button onclick="confirmarParcela('Pix')"      class="py-3 rounded-xl bg-blue-600/20   border border-blue-500/25   text-blue-300   font-black text-[9px] uppercase flex flex-col items-center gap-1 hover:bg-blue-600/35   transition-all"><i class="fas fa-qrcode text-base"></i>Pix</button>
+      <button onclick="confirmarParcela('Cartão')"   class="py-3 rounded-xl bg-purple-600/20 border border-purple-500/25 text-purple-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 hover:bg-purple-600/35 transition-all"><i class="fas fa-credit-card text-base"></i>Cartão</button>
+    </div>
+
+    <button onclick="UIService.closeModal('modalParcela')" class="w-full bg-slate-800 py-3 rounded-xl font-black uppercase text-xs text-slate-400">Cancelar</button>
+  </div>
+</div>
+
+<div id="modalReceber" class="modal">
+  <div class="modal-box max-w-sm p-8">
+    <h3 class="text-sm font-black text-emerald-400 mb-2 flex items-center gap-2"><i class="fas fa-hand-holding-usd"></i> Receber Pagamento</h3>
+    <p id="receberNome" class="text-[10px] text-slate-400 font-bold uppercase mb-1"></p>
+    <p id="receberSaldoAtual" class="text-[9px] text-red-400 font-bold mb-6"></p>
+    <div class="space-y-4">
+      <div>
+        <label class="label !text-emerald-400">Valor Recebido (R$) <span class="text-red-500">*</span></label>
+        <input type="number" id="fReceberValor" class="inp text-xl font-black" placeholder="0,00" step="0.01" min="0.01">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="document.getElementById('fReceberValor').value=_getSaldoAtual().toFixed(2)" class="py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-black text-[9px] uppercase transition-all hover:bg-emerald-500/20">Total</button>
+        <button onclick="document.getElementById('fReceberValor').value=(_getSaldoAtual()/2).toFixed(2)" class="py-2.5 rounded-xl bg-slate-800 border border-white/5 text-slate-400 font-black text-[9px] uppercase transition-all hover:bg-slate-700">Metade</button>
+      </div>
+      <div>
+        <label class="label !text-emerald-400">Forma de Pagamento</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="confirmarRecebimento('Dinheiro')" class="py-3 rounded-xl bg-emerald-600/20 border border-emerald-500/25 text-emerald-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 active:scale-95 hover:bg-emerald-600/35 transition-all"><i class="fas fa-money-bill-wave text-base"></i>Dinheiro</button>
+          <button onclick="confirmarRecebimento('Pix')"     class="py-3 rounded-xl bg-blue-600/20 border border-blue-500/25 text-blue-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 active:scale-95 hover:bg-blue-600/35 transition-all"><i class="fas fa-qrcode text-base"></i>Pix</button>
+          <button onclick="confirmarRecebimento('Cartão')"  class="py-3 rounded-xl bg-purple-600/20 border border-purple-500/25 text-purple-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 active:scale-95 hover:bg-purple-600/35 transition-all"><i class="fas fa-credit-card text-base"></i>Cartão</button>
+        </div>
+      </div>
+    </div>
+    <button onclick="UIService.closeModal('modalReceber')" class="w-full mt-4 bg-slate-800 py-3 rounded-xl font-black uppercase text-xs text-slate-400">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══════ MODAL RELATÓRIO ══════ -->
+<div id="modalRelatorio" class="modal">
+  <div class="modal-box max-w-sm p-0 overflow-hidden">
+    <div class="p-5 border-b border-white/5 flex items-center justify-between">
+      <div>
+        <h3 class="text-sm font-black text-red-400 flex items-center gap-2"><i class="fas fa-handshake"></i> Relatório de Fiado</h3>
+        <p id="relData" class="text-[9px] text-slate-500 font-bold mt-0.5"></p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="copiarRelatorio()" class="w-8 h-8 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 flex items-center justify-center"><i class="fas fa-copy text-sm"></i></button>
+        <button onclick="baixarRelatorio()" class="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 flex items-center justify-center"><i class="fas fa-download text-sm"></i></button>
+        <button onclick="UIService.closeModal('modalRelatorio')" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"><i class="fas fa-times text-xs"></i></button>
+      </div>
+    </div>
+    <div class="overflow-y-auto scroll" style="max-height:76vh;">
+      <div class="grid grid-cols-2 gap-3 p-5 border-b border-white/5">
+        <div class="bg-red-500/8 border border-red-500/15 rounded-2xl p-3 text-center">
+          <p class="text-[8px] text-red-400 font-black uppercase mb-1">Total Devido</p>
+          <p id="relTotalDevido" class="text-xl font-black text-red-300">R$ 0,00</p>
+        </div>
+        <div class="bg-slate-900/60 border border-white/5 rounded-2xl p-3 text-center">
+          <p class="text-[8px] text-slate-500 font-black uppercase mb-1">Clientes c/ Saldo</p>
+          <p id="relComSaldo" class="text-xl font-black text-white">0</p>
+        </div>
+        <div class="bg-emerald-500/8 border border-emerald-500/15 rounded-2xl p-3 text-center">
+          <p class="text-[8px] text-emerald-400 font-black uppercase mb-1">Quitados</p>
+          <p id="relQuitados" class="text-xl font-black text-emerald-400">0</p>
+        </div>
+        <div class="bg-amber-500/8 border border-amber-500/15 rounded-2xl p-3 text-center">
+          <p class="text-[8px] text-amber-400 font-black uppercase mb-1">Bloqueados</p>
+          <p id="relBloqueados" class="text-xl font-black text-amber-400">0</p>
+        </div>
+      </div>
+      <div class="p-5">
+        <p class="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-3">Saldo por Cliente</p>
+        <div id="relLista" class="space-y-1.5 max-h-72 overflow-y-auto scroll"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">
+  <div id="toastIcon" class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-black"></div>
+  <div><span id="toastMsg" class="text-[11px] font-black uppercase tracking-wide block"></span><span id="toastSub" class="text-[9px] text-slate-500 font-bold"></span></div>
+</div>
+
+<script src="core.js"></script>
+  <script src="./services/permissoesService.js"></script>
+  <script src="./services/userService.js"></script>
+  <script src="./services/syncService.js"></script>
+  <script src="./services/auditService.js"></script>
+  <script src="./services/syncMonitor.js"></script>
+  <script src="./services/backupService.js"></script>
+  <script src="./services/featureFlagsService.js"></script>
+  <script src="./services/soundService.js"></script>
+  <script src="./services/whitelabelService.js"></script>
+  <script src="./services/filialService.js"></script>
+
+<script>
+'use strict';
+
+async function doLogin() {
+  const nome  = document.getElementById('loginNome')?.value.trim();
+  const senha = document.getElementById('loginSenha')?.value.trim();
+  const err   = document.getElementById('lockError');
+  err.textContent = '';
+  err.classList.add('hidden');
+  if (!nome || !senha) {
+    err.textContent = 'Preencha usuario e senha.';
+    err.classList.remove('hidden');
+    return;
+  }
+  let ok = false;
+  if (window.CH && window.CH.UserService) {
+    const user = await window.CH.UserService.login(nome, senha);
+    ok = !!user;
+  } else {
+    ok = await AuthService.login(senha);
+  }
+  if (ok) {
+    document.getElementById('lock').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    const _r = AuthService.getRole();
+    if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+    const rt = document.getElementById('roleTag');
+    if (rt) {
+      const _pi = window.CH && window.CH.PermissoesService && window.CH.PermissoesService.getPerfil && window.CH.PermissoesService.getPerfil(_r);
+      rt.textContent = (_pi && _pi.label) || _r || 'PDV';
+      rt.classList.remove('hidden');
+    }
+    init();
+  } else {
+    err.textContent = 'Usuario ou senha incorretos.';
+    err.classList.remove('hidden');
+    document.getElementById('loginSenha').value = '';
+    document.getElementById('loginSenha').focus();
+  }
+}
+document.getElementById('loginSenha').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+document.getElementById('loginNome').addEventListener('keydown',  function(e) { if (e.key === 'Enter') document.getElementById('loginSenha').focus(); });
+function logout() { if (!confirm('Encerrar sessão?')) return; AuthService.logout(); location.reload(); }
+
+/* ═══════════ ESTADO ═══════════ */
+let _clienteAtualId = null;
+
+/* ═══════════ INIT ═══════════ */
+function init() {
+  window.CH?.WhitelabelService?.aplicar?.({});
+  UIService.startClock('clock');
+  if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+  atualizarKpis();
+  renderClientes();
+  EventBus.on('store:updated', () => { atualizarKpis(); if (_clienteAtualId) renderDetalhe(); else renderClientes(); });
+}
+
+/* ═══════════ VISTAS ═══════════ */
+function mostrarVista(v) {
+  document.getElementById('vistaLista').classList.toggle('ativa', v==='lista');
+  document.getElementById('vistaDetalhe').classList.toggle('ativa', v==='detalhe');
+  document.getElementById('btnVoltar').classList.toggle('hidden', v==='lista');
+  document.getElementById('btnNovoCliente').classList.toggle('hidden', v==='detalhe');
+  document.getElementById('btnRelatorio').classList.toggle('hidden', v==='detalhe');
+}
+
+function voltarLista() {
+  _clienteAtualId = null;
+  _set('headerTitulo','Fiado');
+  mostrarVista('lista');
+  atualizarKpis();
+  renderClientes();
+}
+
+/* ═══════════ KPIs ═══════════ */
+function atualizarKpis() {
+  const clientes   = Store.getFiado();
+  const totalDev   = clientes.reduce((s,c) => s+(c.saldo||0), 0);
+  const bloqueados = clientes.filter(c=>c.bloqueado).length;
+  _set('kpiTotal',     Utils.formatCurrency(totalDev));
+  _set('kpiClientes',  clientes.length);
+  _set('kpiBloqueados',bloqueados);
+}
+
+/* ═══════════ LISTA DE CLIENTES ═══════════ */
+function renderClientes() {
+  const busca    = (document.getElementById('buscaCliente')?.value||'').toLowerCase();
+  let clientes   = Store.getFiado();
+  if (busca) clientes = clientes.filter(c=>(c.nome||'').toLowerCase().includes(busca)||(c.telefone||'').includes(busca));
+  clientes = [...clientes].sort((a,b)=>(b.saldo||0)-(a.saldo||0));
+
+  const el = document.getElementById('listaClientes');
+  if (!el) return;
+
+  if (clientes.length === 0) {
+    el.innerHTML = `<div class="col-span-2 flex flex-col items-center justify-center py-24 opacity-30">
+      <i class="fas fa-handshake text-5xl text-slate-600 mb-4"></i>
+      <p class="text-[10px] font-black uppercase tracking-widest text-slate-600">${Store.getFiado().length===0?'Nenhum cliente cadastrado':'Nenhum cliente encontrado'}</p>
+      ${Store.getFiado().length===0?'<button onclick="abrirFormCliente()" class="mt-4 bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase transition-all">+ Adicionar Cliente</button>':''}
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = clientes.map(c => {
+    const saldo    = c.saldo||0;
+    const quitado  = saldo <= 0;
+    const status   = c.bloqueado ? 'bloqueado' : quitado ? 'quitado' : 'devendo';
+    const badgeCls = c.bloqueado ? 'b-amber' : quitado ? 'b-green' : 'b-red';
+    const badgeTxt = c.bloqueado ? '🔒 Bloqueado' : quitado ? '✓ Quitado' : `Deve ${Utils.formatCurrency(saldo)}`;
+    return `<div class="cli-card ${status}" onclick="abrirCliente('${c.id}')">
+      <div class="flex items-start justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-slate-800 flex items-center justify-center font-black text-lg text-slate-300 flex-shrink-0">${(c.nome||'?').charAt(0).toUpperCase()}</div>
+          <div>
+            <p class="text-[13px] font-black text-white">${c.nome}</p>
+            ${c.telefone ? `<p class="text-[8px] text-slate-500 font-bold">${c.telefone}</p>` : ''}
+          </div>
+        </div>
+        <span class="badge ${badgeCls} flex-shrink-0">${badgeTxt}</span>
+      </div>
+      ${c.limite>0 ? `<div class="mt-2"><div class="flex justify-between text-[8px] font-bold mb-1"><span class="text-slate-500">Limite</span><span class="text-amber-400">${Utils.formatCurrency(saldo)} / ${Utils.formatCurrency(c.limite)}</span></div><div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div class="h-full ${saldo>c.limite?'bg-red-500':'bg-amber-500'} rounded-full" style="width:${Math.min(100,(saldo/c.limite)*100)}%"></div></div></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════ DETALHE DO CLIENTE ═══════════ */
+function abrirCliente(id) {
+  _clienteAtualId = id;
+  const c = Store.getFiado().find(x=>x.id===id);
+  if (!c) return;
+  _set('headerTitulo', c.nome);
+  mostrarVista('detalhe');
+  renderDetalhe();
+}
+
+function renderDetalhe() {
+  const c = Store.getFiado().find(x=>x.id===_clienteAtualId);
+  if (!c) return;
+  const saldo   = c.saldo||0;
+  const quitado = saldo <= 0;
+  _set('detNome',   c.nome);
+  _set('detTel',    c.telefone ? '📞 '+c.telefone : '');
+  _set('detLimite', c.limite>0 ? `Limite: ${Utils.formatCurrency(c.limite)}` : 'Sem limite');
+  _set('detSaldo',  Utils.formatCurrency(Math.abs(saldo)));
+  const stEl = document.getElementById('detStatus');
+  if (stEl) {
+    stEl.textContent = c.bloqueado ? '🔒 Bloqueado' : quitado ? '✓ Quitado' : 'Devendo';
+    stEl.className   = 'badge ' + (c.bloqueado ? 'b-amber' : quitado ? 'b-green' : 'b-red') + ' mt-1';
+  }
+  const saldoEl = document.getElementById('detSaldo');
+  if (saldoEl) saldoEl.className = `text-3xl font-black ${quitado ? 'text-emerald-400' : 'text-red-400'}`;
+
+  // Renderiza com abas: Compras | Pagamentos
+  _renderDetalheAbas(c);
+}
+
+let _detalheAba = 'compras';
+
+function _setDetalheAba(aba) {
+  _detalheAba = aba;
+  document.querySelectorAll('.rastreio-tab').forEach(t =>
+    t.classList.toggle('on', t.dataset.aba === aba)
+  );
+  const c = Store.getFiado().find(x => x.id === _clienteAtualId);
+  if (c) _renderDetalheConteudo(c);
+}
+
+function _renderDetalheAbas(c) {
+  const histEl = document.getElementById('detHistorico');
+  if (!histEl) return;
+
+  // Injeta tabs acima do conteúdo
+  histEl.innerHTML = `
+    <div class="rastreio-tabs">
+      <div class="rastreio-tab on" data-aba="compras"   onclick="_setDetalheAba('compras')">🛒 Compras</div>
+      <div class="rastreio-tab"   data-aba="pagamentos" onclick="_setDetalheAba('pagamentos')">💰 Pagamentos</div>
+    </div>
+    <div id="detalheConteudo"></div>
+  `;
+  _detalheAba = 'compras';
+  _renderDetalheConteudo(c);
+}
+
+function _renderDetalheConteudo(c) {
+  const el = document.getElementById('detalheConteudo');
+  if (!el) return;
+
+  if (_detalheAba === 'compras') {
+    el.innerHTML = _renderCompras(c);
+  } else {
+    el.innerHTML = _renderPagamentos(c);
+  }
+}
+
+function _renderCompras(c) {
+  // Busca vendas fiado do cliente no Store de vendas (com itens completos)
+  const vendasFiado = (Store.getVendas() || [])
+    .filter(v => v._fiado && v._fiadoClienteId === c.id)
+    .sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
+
+  // Também pega lançamentos manuais do fiado (sem venda associada)
+  const lancamentosManual = (c.movimentacoes || [])
+    .filter(m => m.tipo === 'fiado')
+    .map(m => ({
+      _manual: true,
+      id:       m.id,
+      criadoEm: m.criadoEm,
+      total:    m.valor,
+      status:   'concluida',
+      itens:    m.itens || [],
+      descricao: m.descricao,
+    }));
+
+  const tudo = [...vendasFiado, ...lancamentosManual]
+    .sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
+
+  if (!tudo.length) {
+    return '<div class="compra-vazio">Nenhuma compra registrada</div>';
+  }
+
+  const totalGeral = tudo.reduce((s, v) => s + (v.total || 0), 0);
+
+  const blocos = tudo.map((v, idx) => {
+    const dt       = v.criadoEm ? new Date(v.criadoEm) : null;
+    const dataStr  = dt ? dt.toLocaleDateString('pt-BR') : '—';
+    const horaStr  = dt ? dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const stMap    = {
+      pendente: ['cs-pend','⏳ Aguardando aprovação'],
+      aprovada: ['cs-apr', '✅ Aprovada'],
+      concluida:['cs-ok',  '✓ Concluída'],
+      rejeitada:['cs-rej', '❌ Rejeitada'],
+    };
+    const [stCls, stTxt] = stMap[v.status] || stMap['concluida'];
+
+    const itens = v.itens || [];
+    const itensHTML = itens.length
+      ? itens.map(i => `
+          <div class="compra-item">
+            <div>
+              <div class="ci-nome">${i.nome || '—'}</div>
+              <div class="ci-qtd">${i.qtd} ${i.label || 'un'} × ${Utils.formatCurrency(i.preco || 0)}</div>
+            </div>
+            <div class="ci-val">${Utils.formatCurrency((i.preco || 0) * (i.qtd || 1))}</div>
+          </div>`).join('')
+      : `<div class="ci-nome text-slate-600 text-[11px] py-1">${v.descricao || 'Sem itens detalhados'}</div>`;
+
+    const bodyId = 'cb_' + idx;
+    return `
+      <div class="compra-bloco">
+        <div class="compra-header" onclick="document.getElementById('${bodyId}').classList.toggle('hidden')">
+          <div>
+            <div class="compra-data">${dataStr}</div>
+            <div class="compra-hora">${horaStr}${v._manual ? ' · Lançamento manual' : ' · PDV'}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="compra-total">${Utils.formatCurrency(v.total || 0)}</div>
+            <div class="compra-status ${stCls}">${stTxt}</div>
+          </div>
+        </div>
+        <div id="${bodyId}" class="compra-itens">
+          ${itensHTML}
+        </div>
+      </div>`;
+  }).join('');
+
+  const resumo = `
+    <div class="compra-resumo" style="margin:.25rem 1rem .75rem;border-radius:.75rem">
+      <span class="cr-label">Total em aberto</span>
+      <span class="cr-val">${Utils.formatCurrency(c.saldo || 0)}</span>
+    </div>`;
+
+  return blocos + resumo;
+}
+
+function _renderPagamentos(c) {
+  const pgtos = (c.movimentacoes || [])
+    .filter(m => ['pagamento','parcela','ajuste_adm'].includes(m.tipo))
+    .slice(0, 100);
+
+  if (!pgtos.length) {
+    return '<div class="compra-vazio">Nenhum pagamento registrado</div>';
+  }
+
+  const totalPago = pgtos.filter(m => m.tipo !== 'ajuste_adm').reduce((s, m) => s + (m.valor || 0), 0);
+
+  const linhas = pgtos.map(m => {
+    const data = m.criadoEm ? new Date(m.criadoEm).toLocaleString('pt-BR') : '—';
+    const isParcela = m.tipo === 'parcela';
+    const isAdm     = m.tipo === 'ajuste_adm';
+    const cor  = isAdm ? 'text-amber-400' : 'text-emerald-400';
+    const icone= isAdm ? 'fa-eraser' : isParcela ? 'fa-layer-group' : 'fa-arrow-down';
+    const bgCls= isAdm ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400';
+    return `<div class="movim-row">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${bgCls}">
+        <i class="fas ${icone} text-sm"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[11px] font-black text-white">${m.descricao || m.tipo}</p>
+        <p class="text-[8px] text-slate-500 font-bold">${data}${m.formaPgto ? ' · ' + m.formaPgto : ''}</p>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <p class="text-[12px] font-black ${cor}">-${Utils.formatCurrency(m.valor)}</p>
+        ${AuthService.isAdmin() ? `<button onclick="apagarMovimentacao('${m.id}')" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center"><i class="fas fa-times text-[9px]"></i></button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const resumo = `
+    <div class="compra-resumo" style="margin:.25rem 1rem .75rem;border-radius:.75rem">
+      <span class="cr-label">Total recebido</span>
+      <span class="cr-val">${Utils.formatCurrency(totalPago)}</span>
+    </div>`;
+
+  return `<div style="padding:.5rem 1rem 0">${linhas}</div>` + resumo;
+}
+
+/* ═══════════ FORM CLIENTE ═══════════ */
+function abrirFormCliente(id) {
+  const isEditar = !!id;
+  const c = id ? Store.getFiado().find(x=>x.id===id) : null;
+  document.getElementById('fCliId').value    = c?.id||'';
+  document.getElementById('fCliNome').value  = c?.nome||'';
+  document.getElementById('fCliTel').value   = c?.telefone||'';
+  document.getElementById('fCliLimite').value= c?.limite||0;
+  _set('formCliTitulo', isEditar ? '<i class="fas fa-edit"></i> Editar Cliente' : '<i class="fas fa-user-plus"></i> Novo Cliente');
+  document.getElementById('formCliTitulo').innerHTML = isEditar ? '<i class="fas fa-edit"></i> Editar Cliente' : '<i class="fas fa-user-plus"></i> Novo Cliente';
+  UIService.openModal('modalCliente');
+  setTimeout(() => document.getElementById('fCliNome')?.focus(), 200);
+}
+
+function editarCliente() { abrirFormCliente(_clienteAtualId); }
+
+function salvarCliente() {
+  const nome   = (document.getElementById('fCliNome')?.value||'').trim();
+  const tel    = (document.getElementById('fCliTel')?.value||'').trim();
+  const limite = parseFloat(document.getElementById('fCliLimite')?.value)||0;
+  const id     = document.getElementById('fCliId')?.value;
+  if (!nome) { UIService.showToast('Nome obrigatório','','error'); return; }
+
+  Store.mutateFiado(fiado => {
+    if (id) {
+      const idx = fiado.findIndex(c=>c.id===id);
+      if (idx>=0) { fiado[idx].nome=nome; fiado[idx].telefone=tel; fiado[idx].limite=limite; }
+    } else {
+      fiado.unshift({ id:Utils.generateId(), nome, telefone:tel, limite, saldo:0, bloqueado:false, movimentacoes:[], criadoEm:new Date().toISOString() });
+    }
+  });
+  UIService.closeModal('modalCliente');
+  UIService.showToast(id?'Cliente atualizado!':'Cliente cadastrado!', nome, 'success');
+}
+
+/* ═══════════ LANÇAR FIADO ═══════════ */
+function abrirLancarFiado() {
+  const c = Store.getFiado().find(x=>x.id===_clienteAtualId);
+  if (!c) return;
+  // Verifica bloqueio por limite
+  if (c.bloqueado) { UIService.showToast('Cliente bloqueado','Quite o saldo primeiro','error'); return; }
+  if (c.limite>0 && (c.saldo||0) >= c.limite) { UIService.showToast('Limite atingido',`Limite: ${Utils.formatCurrency(c.limite)}`,'error'); return; }
+  _set('lancarNome', c.nome + ' — Saldo: ' + Utils.formatCurrency(c.saldo||0));
+  document.getElementById('fLancarValor').value = '';
+  document.getElementById('fLancarDesc').value  = '';
+  UIService.openModal('modalLancar');
+  setTimeout(() => document.getElementById('fLancarValor')?.focus(), 200);
+}
+
+function confirmarLancamento() {
+  const valor = parseFloat(document.getElementById('fLancarValor')?.value)||0;
+  const desc  = (document.getElementById('fLancarDesc')?.value||'').trim()||'Compra fiado';
+  if (valor <= 0) { UIService.showToast('Valor inválido','','error'); return; }
+
+  Store.mutateFiado(fiado => {
+    const c = fiado.find(x=>x.id===_clienteAtualId);
+    if (!c) return;
+    c.saldo = (c.saldo||0) + valor;
+    if (!Array.isArray(c.movimentacoes)) c.movimentacoes = [];
+    c.movimentacoes.unshift({ id:Utils.generateId(), tipo:'fiado', descricao:desc, valor, criadoEm:new Date().toISOString() });
+    if (c.limite>0 && c.saldo >= c.limite) c.bloqueado = true;
+  });
+
+  UIService.closeModal('modalLancar');
+  UIService.showToast(`+${Utils.formatCurrency(valor)} fiado`, desc, 'warning');
+  renderDetalhe();
+}
+
+/* ═══════════ RECEBER PAGAMENTO ═══════════ */
+
+/* ═══════════ PAGAMENTO POR PARCELAS ═══════════ */
+
+// Retorna a venda fiado associada ao cliente atual (se existir)
+function _getVendaFiadoCliente(clienteId) {
+  return (Store.getVendas() || []).find(v =>
+    v._fiado &&
+    v._fiadoClienteId === clienteId &&
+    ['pendente','aprovada','concluida'].includes(v.status)
+  ) || null;
+}
+
+function abrirParcela() {
+  const c = Store.getFiado().find(x => x.id === _clienteAtualId);
+  if (!c) return;
+  if ((c.saldo || 0) <= 0) { UIService.showToast('Sem saldo devedor', '', 'info'); return; }
+
+  _set('parcelaNome',   c.nome);
+
+  // Tenta achar venda fiado vinculada para exibir total original
+  const venda = _getVendaFiadoCliente(_clienteAtualId);
+  const totalOriginal = venda ? venda.total : (c.saldo || 0);
+  const jaPago = Math.max(0, totalOriginal - (c.saldo || 0));
+  const saldoAtual = c.saldo || 0;
+
+  _set('parcelaTotal',  'Total da compra: ' + Utils.formatCurrency(totalOriginal));
+  _set('parcelaJaPago', jaPago > 0 ? 'Já pago: ' + Utils.formatCurrency(jaPago) : '');
+  _set('parcelaSaldo',  'Saldo restante: ' + Utils.formatCurrency(saldoAtual));
+
+  // Barra de progresso
+  const pct = totalOriginal > 0 ? Math.min(100, (jaPago / totalOriginal) * 100) : 0;
+  document.getElementById('parcelaBarra').style.width = pct + '%';
+
+  // Histórico de parcelas pagas
+  const hist = (c.movimentacoes || []).filter(m => m.tipo === 'parcela' || m.tipo === 'pagamento');
+  const histEl = document.getElementById('parcelaHistorico');
+  histEl.innerHTML = hist.length
+    ? hist.slice(0, 6).map(m => `
+        <div class="parcela-item">
+          <div>
+            <div class="font-semibold text-slate-300">${m.descricao || 'Parcela'}</div>
+            <div class="text-[10px] text-slate-500">${m.criadoEm ? m.criadoEm.slice(0,16).replace('T',' ') : ''} · ${m.formaPgto || ''}</div>
+          </div>
+          <div class="text-emerald-400 font-black">${Utils.formatCurrency(m.valor)}</div>
+        </div>`).join('')
+    : '<p class="text-[10px] text-slate-600 text-center py-2">Nenhuma parcela registrada</p>';
+
+  // Itens da venda para baixa proporcional
+  const itensWrap = document.getElementById('parcelaItensWrap');
+  if (venda && venda.itens && venda.itens.length) {
+    itensWrap.style.display = 'block';
+    document.getElementById('parcelaItens').innerHTML =
+      venda.itens.map(i => `<div class="parcela-item"><span>${i.nome}</span><span class="text-slate-300">${i.qtd} ${i.label||'un'} · ${Utils.formatCurrency(i.preco * i.qtd)}</span></div>`).join('');
+  } else {
+    itensWrap.style.display = 'none';
+  }
+
+  document.getElementById('fParcelaValor').value = '';
+  document.getElementById('parcelaPreviewBaixa').classList.add('hidden');
+  UIService.openModal('modalParcela');
+  setTimeout(() => document.getElementById('fParcelaValor')?.focus(), 200);
+}
+
+function _parcelaGetSaldo() {
+  return Store.getFiado().find(x => x.id === _clienteAtualId)?.saldo || 0;
+}
+
+function _parcelaSetValor(tipo) {
+  const saldo = _parcelaGetSaldo();
+  const mapa  = { total: saldo, metade: saldo / 2, tercao: saldo / 3 };
+  document.getElementById('fParcelaValor').value = (mapa[tipo] || 0).toFixed(2);
+  _parcelaPreview();
+}
+
+function _parcelaPreview() {
+  const val   = parseFloat(document.getElementById('fParcelaValor').value) || 0;
+  const saldo = _parcelaGetSaldo();
+  const prev  = document.getElementById('parcelaPreviewBaixa');
+  if (val <= 0 || val > saldo) { prev.classList.add('hidden'); return; }
+
+  const venda = _getVendaFiadoCliente(_clienteAtualId);
+  if (!venda || !venda.itens || !venda.itens.length) { prev.classList.add('hidden'); return; }
+
+  // Calcula proporção: quanto do total está sendo pago agora
+  const proporcao = val / saldo;
+  const itensDesc = venda.itens
+    .map(i => {
+      const qtdBaixa = Math.round(i.qtd * proporcao * 100) / 100;
+      return qtdBaixa > 0 ? `${i.nome} ×${qtdBaixa}` : null;
+    })
+    .filter(Boolean)
+    .join(', ');
+
+  prev.classList.remove('hidden');
+  prev.textContent = '📦 Baixará: ' + (itensDesc || 'itens proporcionais');
+}
+
+async function confirmarParcela(forma) {
+  const { Store, AuthService, Utils, EventBus } = window.CH;
+  const valor  = parseFloat(document.getElementById('fParcelaValor')?.value) || 0;
+  const saldo  = _parcelaGetSaldo();
+  if (valor <= 0)     { UIService.showToast('Valor inválido', '', 'error'); return; }
+  if (valor > saldo)  { UIService.showToast('Valor maior que o saldo', '', 'error'); return; }
+
+  const venda      = _getVendaFiadoCliente(_clienteAtualId);
+  const proporcao  = saldo > 0 ? valor / saldo : 0;
+  const isQuitando = Math.abs(valor - saldo) < 0.01;
+
+  let _nomeCliente = '';
+
+  // ── 1) Atualiza saldo do cliente ──────────────────────────────────
+  Store.mutateFiado(fiado => {
+    const cx = fiado.find(x => x.id === _clienteAtualId);
+    if (!cx) return;
+    _nomeCliente = cx.nome;
+    cx.saldo = Math.max(0, (cx.saldo || 0) - valor);
+    if (!Array.isArray(cx.movimentacoes)) cx.movimentacoes = [];
+    cx.movimentacoes.unshift({
+      id:        Utils.generateId(),
+      tipo:      'parcela',
+      descricao: isQuitando ? 'Quitação total' : `Parcela ${Utils.formatCurrency(valor)}`,
+      valor,
+      formaPgto: forma,
+      proporcao: proporcao.toFixed(4),
+      criadoEm:  new Date().toISOString(),
+    });
+    if (cx.saldo <= 0) { cx.bloqueado = false; }
+  });
+
+  // ── 2) Baixa proporcional de estoque ─────────────────────────────
+  if (venda && venda.itens && venda.itens.length) {
+    const ES = window.CH?.EstoqueService;
+    for (const item of venda.itens) {
+      const qtdBaixa = isQuitando
+        ? item.qtd - (item._qtdBaixada || 0)                      // quitou: baixa o restante
+        : Math.round(item.qtd * proporcao * 100) / 100;           // parcial: proporcional
+
+      if (qtdBaixa <= 0) continue;
+
+      // Atualiza controle de baixa na venda
+      if (!item._qtdBaixada) item._qtdBaixada = 0;
+      item._qtdBaixada = Math.min(item.qtd, item._qtdBaixada + qtdBaixa);
+
+      if (ES?.registrarMovimentacao) {
+        try {
+          await ES.registrarMovimentacao({
+            produtoId:  item.prodId,
+            tipo:       'venda',
+            quantidade: qtdBaixa,
+            origem:     'fiado-parcela',
+            operador:   AuthService.getNome(),
+            observacao: `Parcela fiado — ${_nomeCliente} (${Utils.formatCurrency(valor)})`,
+          });
+        } catch(e) {
+          // Fallback: baixa direto no Store
+          Store.mutateEstoque(est => {
+            const p = est.find(x => x.id === item.prodId);
+            if (p) { p.qtdUn = Math.max(0, (p.qtdUn || 0) - qtdBaixa); p.estoqueAtual = p.qtdUn; }
+          });
+        }
+      } else {
+        Store.mutateEstoque(est => {
+          const p = est.find(x => x.id === item.prodId);
+          if (p) { p.qtdUn = Math.max(0, (p.qtdUn || 0) - qtdBaixa); p.estoqueAtual = p.qtdUn; }
+        });
+      }
+    }
+
+    // Atualiza venda com controle de baixas
+    Store.mutateVendas(vendas => {
+      const v = vendas.find(x => x.id === venda.id);
+      if (v) {
+        v.itens = venda.itens; // itens atualizados com _qtdBaixada
+        v._baixouEstoque = isQuitando || venda.itens.every(i => i._qtdBaixada >= i.qtd);
+        if (isQuitando) v.status = 'concluida';
+      }
+    });
+    if (window.CH.SyncQueue) window.CH.SyncQueue.enqueue('salvar', 'vendas', [venda]);
+  }
+
+  // ── 3) Registra movimentação financeira ───────────────────────────
+  Store.mutateVendas(vendas => {
+    vendas.unshift({
+      id:        Utils.generateId(),
+      dataCurta: Utils.todayISO(),
+      data:      Utils.today(),
+      hora:      Utils.nowTime(),
+      criadoEm:  new Date().toISOString(),
+      itens:     [],
+      total:     valor,
+      subtotal:  valor,
+      desconto:  0,
+      lucro:     0,
+      formaPgto: forma,
+      origem:    'FIADO-PARCELA',
+      nomeCliente: _nomeCliente,
+    });
+  });
+
+  if (window.CH.SyncQueue) window.CH.SyncQueue.enqueue('salvar', 'fiado', Store.getFiado());
+
+  UIService.closeModal('modalParcela');
+
+  const msg = isQuitando ? 'Fiado quitado!' : `Parcela de ${Utils.formatCurrency(valor)} registrada`;
+  UIService.showToast(msg, forma, 'success');
+  EventBus.emit('fiado:parcela', { clienteId: _clienteAtualId, valor, forma, isQuitando });
+  renderDetalhe();
+}
+
+function abrirReceberPgto() {
+  const c = Store.getFiado().find(x=>x.id===_clienteAtualId);
+  if (!c || (c.saldo||0) <= 0) { UIService.showToast('Sem saldo devedor','','info'); return; }
+  _set('receberNome', c.nome);
+  _set('receberSaldoAtual', 'Saldo atual: ' + Utils.formatCurrency(c.saldo||0));
+  document.getElementById('fReceberValor').value = '';
+  UIService.openModal('modalReceber');
+  setTimeout(() => document.getElementById('fReceberValor')?.focus(), 200);
+}
+
+function _getSaldoAtual() {
+  return Store.getFiado().find(x=>x.id===_clienteAtualId)?.saldo||0;
+}
+
+function confirmarRecebimento(forma) {
+  const valor = parseFloat(document.getElementById('fReceberValor')?.value)||0;
+  if (valor <= 0) { UIService.showToast('Valor inválido','','error'); return; }
+
+  let _nomeCliente = '';
+  Store.mutateFiado(fiado => {
+    const c = fiado.find(x=>x.id===_clienteAtualId);
+    if (!c) return;
+    _nomeCliente = c.nome;
+    c.saldo = Math.max(0, (c.saldo||0) - valor);
+    if (!Array.isArray(c.movimentacoes)) c.movimentacoes = [];
+    c.movimentacoes.unshift({ id:Utils.generateId(), tipo:'pagamento', descricao:'Pagamento recebido', valor, formaPgto:forma, criadoEm:new Date().toISOString() });
+    if (c.saldo <= 0) c.bloqueado = false;
+  });
+  // Registra movimentação financeira separada
+  Store.mutateVendas(vendas => {
+    vendas.unshift({ id:Utils.generateId(), dataCurta:Utils.todayISO(), data:Utils.today(), hora:Utils.nowTime(),
+      criadoEm:new Date().toISOString(), itens:[], total:valor, subtotal:valor, desconto:0, lucro:0,
+      formaPgto:forma, origem:'FIADO', nomeCliente:_nomeCliente });
+  });
+
+  UIService.closeModal('modalReceber');
+  UIService.showToast(`Recebido ${Utils.formatCurrency(valor)}`, forma, 'success');
+  renderDetalhe();
+}
+
+/* ═══════════ RELATÓRIO ═══════════ */
+function abrirRelatorio() {
+  const clientes   = Store.getFiado();
+  const comSaldo   = clientes.filter(c=>(c.saldo||0)>0);
+  const quitados   = clientes.filter(c=>(c.saldo||0)<=0);
+  const bloqueados = clientes.filter(c=>c.bloqueado);
+  const totalDevido= comSaldo.reduce((s,c)=>s+(c.saldo||0),0);
+
+  _set('relTotalDevido', Utils.formatCurrency(totalDevido));
+  _set('relComSaldo',    comSaldo.length);
+  _set('relQuitados',    quitados.length);
+  _set('relBloqueados',  bloqueados.length);
+  _set('relData',        Utils.today());
+
+  const listaEl = document.getElementById('relLista');
+  if (listaEl) {
+    const sorted = [...clientes].sort((a,b)=>(b.saldo||0)-(a.saldo||0));
+    listaEl.innerHTML = sorted.map(c => {
+      const saldo   = c.saldo||0;
+      const quitado = saldo<=0;
+      return `<div class="flex items-center justify-between bg-slate-900/60 border border-white/5 rounded-xl px-3 py-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center font-black text-xs text-slate-400">${(c.nome||'?').charAt(0).toUpperCase()}</div>
+          <div>
+            <p class="text-[10px] font-black text-white">${c.nome}</p>
+            ${c.limite>0?`<p class="text-[8px] text-amber-400 font-bold">Limite: ${Utils.formatCurrency(c.limite)}</p>`:''}
+          </div>
+        </div>
+        <span class="badge ${c.bloqueado?'b-amber':quitado?'b-green':'b-red'} text-[8px]">${c.bloqueado?'Bloqueado':quitado?'Quitado':Utils.formatCurrency(saldo)}</span>
+      </div>`;
+    }).join('') || '<p class="text-[9px] text-slate-600 text-center py-4 font-bold">Nenhum cliente</p>';
+  }
+  UIService.openModal('modalRelatorio');
+}
+
+function _gerarTextoRelatorio() {
+  const clientes   = Store.getFiado();
+  const comSaldo   = clientes.filter(c=>(c.saldo||0)>0);
+  const totalDevido= comSaldo.reduce((s,c)=>s+(c.saldo||0),0);
+  const cfg  = Store.getConfig();
+  const nome = cfg?.nome||'CH Geladas';
+  const sep  = '═'.repeat(42); const sep2='─'.repeat(42);
+  let txt = `${sep}\n  ${nome} — RELATÓRIO DE FIADO\n  ${Utils.today()}\n${sep}\n\n`;
+  txt += `Total devido:    ${Utils.formatCurrency(totalDevido)}\n`;
+  txt += `Com saldo:       ${comSaldo.length}\n`;
+  txt += `Quitados:        ${clientes.filter(c=>(c.saldo||0)<=0).length}\n`;
+  txt += `Bloqueados:      ${clientes.filter(c=>c.bloqueado).length}\n\n`;
+  if (comSaldo.length>0) {
+    txt += `${sep2}\nCLIENTES COM SALDO\n${sep2}\n`;
+    [...comSaldo].sort((a,b)=>(b.saldo||0)-(a.saldo||0)).forEach(c => {
+      txt += `\n  ${c.nome}\n`;
+      if (c.telefone) txt += `  Tel: ${c.telefone}\n`;
+      txt += `  Saldo: ${Utils.formatCurrency(c.saldo||0)}`;
+      if (c.limite>0) txt += `  (Limite: ${Utils.formatCurrency(c.limite)})`;
+      txt += '\n';
+    });
+  }
+  txt += `\n${sep}\nGerado por ${nome} PDV\n${sep}\n`;
+  return txt;
+}
+
+function copiarRelatorio() { Utils.copyToClipboard(_gerarTextoRelatorio()).then(()=>UIService.showToast('Copiado!','','success')); }
+function baixarRelatorio()  { Utils.downloadBlob(_gerarTextoRelatorio(),'text/plain;charset=utf-8;',`relatorio_fiado_${Utils.todayISO()}.txt`); UIService.showToast('Salvo!','','success'); }
+
+function _set(id,val) { const el=document.getElementById(id); if(el) el.textContent=val; }
+
+/* ═══════ ADM — CONTROLES ═══════ */
+function zerarSaldoCliente() {
+  if (!AuthService.isAdmin()) return;
+  const c = Store.getFiado().find(x=>x.id===_clienteAtualId);
+  if (!c) return;
+  if (!confirm(`Zerar saldo de ${c.nome}? (${Utils.formatCurrency(c.saldo||0)})`)) return;
+  Store.mutateFiado(fiado => {
+    const cl = fiado.find(x=>x.id===_clienteAtualId);
+    if (!cl) return;
+    cl.movimentacoes = cl.movimentacoes||[];
+    cl.movimentacoes.unshift({ id:Utils.generateId(), tipo:'ajuste_adm', descricao:'Zeragem ADM', valor:cl.saldo||0, criadoEm:new Date().toISOString() });
+    cl.saldo    = 0;
+    cl.bloqueado= false;
+  });
+  UIService.showToast('Saldo zerado','','warning');
+  renderDetalhe();
+}
+
+function apagarMovimentacao(movId) {
+  if (!AuthService.isAdmin()) return;
+  if (!confirm('Apagar esta movimentação?')) return;
+  Store.mutateFiado(fiado => {
+    const c = fiado.find(x=>x.id===_clienteAtualId);
+    if (!c || !Array.isArray(c.movimentacoes)) return;
+    const idx = c.movimentacoes.findIndex(m=>m.id===movId);
+    if (idx>=0) c.movimentacoes.splice(idx,1);
+  });
+  UIService.showToast('Movimentação apagada','','warning');
+  renderDetalhe();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (!AuthService.isLogged()) { location.href = 'index.html'; return; }
+  document.getElementById('lock').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  const _role = AuthService.getRole();
+  if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+  const rt = document.getElementById('roleTag');
+  if (rt) {
+    const _info = window.CH?.PermissoesService?.getPerfil?.(_role);
+    rt.textContent = _info?.label || _role || 'PDV';
+    rt.classList.remove('hidden');
+  }
+  init();
+});
+</script>
+</body>
+</html>

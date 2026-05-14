@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planos & Assinatura — <span data-wl="nomeEmpresa">CH Geladas</span></title>
+<meta name="theme-color" content="#0f172a">
+<!-- QR Code lib (standalone, sem backend) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--surface:#1e293b;--border:#334155;
+  --text:#f1f5f9;--muted:#94a3b8;--accent:#60a5fa;
+  --green:#10b981;--yellow:#f59e0b;--red:#ef4444;--purple:#a78bfa;
+  --radius:14px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.header h1{font-size:1.1rem;font-weight:800}
+.header-sub{font-size:.75rem;color:var(--muted)}
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-sm{padding:5px 12px;font-size:.78rem}
+
+/* Layout */
+.main{max-width:1100px;margin:0 auto;padding:28px 20px}
+
+/* Assinatura atual */
+.current-plan{background:linear-gradient(135deg,rgba(96,165,250,.12),rgba(167,139,250,.08));border:1px solid rgba(96,165,250,.25);border-radius:var(--radius);padding:24px;margin-bottom:32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.current-badge{font-size:2.5rem}
+.current-info h2{font-size:1.1rem;font-weight:800;margin-bottom:4px}
+.current-info p{font-size:.82rem;color:var(--muted)}
+.current-actions{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+
+/* Planos grid */
+.plans-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:32px}
+.plan-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;position:relative;transition:border-color .2s,transform .15s;cursor:pointer}
+.plan-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.plan-card.current{border-color:var(--green);pointer-events:none}
+.plan-card.destaque{border-color:var(--purple)}
+.plan-card.destaque::before{content:'Mais popular';position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--purple);color:#fff;font-size:.65rem;font-weight:800;padding:3px 12px;border-radius:0 0 8px 8px;white-space:nowrap}
+
+.plan-nome{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.plan-preco{margin-bottom:4px}
+.plan-preco .valor{font-size:2rem;font-weight:900;line-height:1}
+.plan-preco .periodo{font-size:.75rem;color:var(--muted)}
+.plan-preco .anual{font-size:.72rem;color:var(--green);display:block;margin-top:2px}
+.plan-desc{font-size:.78rem;color:var(--muted);margin:12px 0 16px}
+.plan-features{list-style:none;margin-bottom:20px}
+.plan-features li{font-size:.78rem;padding:4px 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.04)}
+.plan-features li:last-child{border:none}
+.plan-features .ok{color:var(--green)}
+.plan-features .no{color:var(--border)}
+.plan-btn{width:100%;padding:10px;border-radius:8px;border:none;font-size:.85rem;font-weight:800;cursor:pointer;transition:all .15s}
+.plan-btn-active{background:rgba(16,185,129,.12);color:var(--green);cursor:default}
+.plan-btn-upgrade{background:var(--accent);color:#fff}
+.plan-btn-upgrade:hover{background:#3b82f6}
+.plan-btn-enterprise{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+
+/* PIX Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:min(460px,94vw);position:relative}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer}
+.modal-close:hover{color:var(--text)}
+.modal h2{font-size:1.15rem;font-weight:800;margin-bottom:4px}
+.modal p{font-size:.82rem;color:var(--muted);margin-bottom:20px}
+
+/* PIX Layout */
+.pix-body{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+.qr-wrap{flex-shrink:0;width:160px;height:160px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pix-details{flex:1;min-width:180px}
+.pix-row{margin-bottom:12px}
+.pix-row label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:3px}
+.pix-copy{display:flex;gap:6px;align-items:center}
+.pix-code{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:.68rem;font-family:monospace;color:var(--text);word-break:break-all;max-height:56px;overflow:hidden}
+.copy-btn{background:var(--border);border:none;color:var(--text);padding:7px 10px;border-radius:6px;cursor:pointer;font-size:.75rem;font-weight:700;white-space:nowrap;flex-shrink:0}
+.copy-btn:hover{background:var(--accent);color:#fff}
+
+/* Status badges */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700}
+.badge-green{background:rgba(16,185,129,.15);color:#34d399}
+.badge-yellow{background:rgba(245,158,11,.15);color:#fcd34d}
+.badge-blue{background:rgba(96,165,250,.15);color:#93c5fd}
+
+/* Histórico */
+.section-title{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:24px 0 12px}
+.hist-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hist-info{font-size:.82rem}
+.hist-info strong{display:block;font-weight:700;margin-bottom:2px}
+.hist-info span{color:var(--muted);font-size:.75rem}
+.hist-val{font-size:.95rem;font-weight:800;color:var(--accent)}
+
+/* Config PIX */
+.config-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:24px}
+.config-section h3{font-size:.88rem;font-weight:800;margin-bottom:14px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:500px){.form-row{grid-template-columns:1fr}}
+.inp{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:.85rem}
+.inp:focus{outline:none;border-color:var(--accent)}
+.inp-label{font-size:.72rem;color:var(--muted);margin-bottom:4px;display:block}
+
+/* Toggle ciclo */
+.ciclo-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px;width:fit-content}
+.ciclo-btn{padding:6px 18px;border-radius:6px;border:none;cursor:pointer;font-size:.82rem;font-weight:700;background:none;color:var(--muted);transition:all .15s}
+.ciclo-btn.active{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+
+/* Loader */
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;right:24px;z-index:999;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:.85rem;font-weight:600;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;max-width:300px}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ok{border-color:var(--green);color:#34d399}
+#toast.err{border-color:var(--red);color:#fca5a5}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div>
+    <h1>💳 Planos & Assinatura</h1>
+    <div class="header-sub" id="empresa-sub">CH Geladas PDV</div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="location.href='index.html'">← Início</button>
+  </div>
+</header>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Modal PIX -->
+<div class="modal-overlay" id="pix-modal" style="display:none">
+  <div class="modal">
+    <button class="modal-close" onclick="fecharModal()">✕</button>
+    <h2>Pagamento via PIX</h2>
+    <p id="pix-modal-desc">Escaneie o QR Code ou copie o código PIX</p>
+    <div class="pix-body">
+      <div class="qr-wrap" id="qr-container"></div>
+      <div class="pix-details">
+        <div class="pix-row">
+          <label>Valor</label>
+          <strong id="pix-valor" style="font-size:1.2rem;color:var(--green)"></strong>
+        </div>
+        <div class="pix-row">
+          <label>Código PIX Copia e Cola</label>
+          <div class="pix-copy">
+            <div class="pix-code" id="pix-codigo"></div>
+            <button class="copy-btn" onclick="copiarPix()">Copiar</button>
+          </div>
+        </div>
+        <div class="pix-row">
+          <label>Validade</label>
+          <span id="pix-expira" style="font-size:.78rem;color:var(--muted)"></span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:20px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:12px;font-size:.78rem;color:#fcd34d">
+      ⚠️ Após o pagamento, aguarde a confirmação do administrador ou envie o comprovante pelo WhatsApp.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-outline" style="flex:1" onclick="fecharModal()">Fechar</button>
+      <button class="btn btn-primary" style="flex:1" onclick="confirmarPgtoAdmin()" id="btn-confirmar-admin">
+        ✓ Confirmar (Admin)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Plano atual -->
+  <div class="current-plan">
+    <div class="current-badge" id="plan-icon">🆓</div>
+    <div class="current-info">
+      <h2 id="plan-nome-atual">Carregando…</h2>
+      <p id="plan-desc-atual"></p>
+    </div>
+    <div class="current-actions">
+      <span class="badge badge-green" id="plan-status">● Ativo</span>
+    </div>
+  </div>
+
+  <!-- Toggle ciclo -->
+  <div class="ciclo-toggle">
+    <button class="ciclo-btn active" id="btn-mensal" onclick="setCiclo('mensal')">Mensal</button>
+    <button class="ciclo-btn" id="btn-anual" onclick="setCiclo('anual')">
+      Anual <span style="color:var(--green);font-size:.68rem">−20%</span>
+    </button>
+  </div>
+
+  <!-- Grade de planos -->
+  <div class="plans-grid" id="plans-grid"></div>
+
+  <!-- Pendente -->
+  <div id="pendente-box" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius);padding:20px;margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <strong style="color:#fcd34d">⏳ Pagamento pendente</strong>
+        <p style="font-size:.8rem;color:var(--muted);margin-top:4px" id="pendente-desc"></p>
+      </div>
+      <button class="btn btn-sm" style="background:#f59e0b;color:#000" onclick="reabrirPix()">Ver PIX</button>
+    </div>
+  </div>
+
+  <!-- Histórico -->
+  <div class="section-title">Histórico de Pagamentos</div>
+  <div id="historico-wrap">
+    <div style="color:var(--muted);font-size:.83rem;text-align:center;padding:20px">Nenhum pagamento registrado.</div>
+  </div>
+
+  <!-- Config PIX (só admin) -->
+  <div class="config-section" id="config-pix-section" style="display:none">
+    <h3>⚙️ Configuração do Recebedor PIX</h3>
+    <div class="form-row">
+      <div>
+        <label class="inp-label">Chave PIX</label>
+        <input type="text" class="inp" id="cfg-chave-pix" placeholder="CPF, CNPJ, telefone, e-mail ou aleatória">
+      </div>
+      <div>
+        <label class="inp-label">Nome do Recebedor</label>
+        <input type="text" class="inp" id="cfg-nome-recebedor" placeholder="Nome na conta">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label class="inp-label">Cidade</label>
+        <input type="text" class="inp" id="cfg-cidade" placeholder="Ex: SAO PAULO">
+      </div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="salvarConfigPix()">Salvar configuração PIX</button>
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="core.js"></script>
+<script src="services/auditService.js"></script>
+<script src="services/permissoesService.js"></script>
+<script src="services/userService.js"></script>
+<script src="services/syncService.js"></script>
+<script src="services/estoqueService.js"></script>
+<script src="services/vendasService.js"></script>
+<script src="services/financeiroService.js"></script>
+<script src="services/saasService.js"></script>
+<script src="services/featureFlagsService.js"></script>
+<script src="services/billingService.js"></script>
+<script src="services/soundService.js"></script>
+<script src="services/whitelabelService.js"></script>
+<script src="services/filialService.js"></script>
+
+<script>
+'use strict';
+
+const { Store, Utils, EventBus } = window.CH;
+let _ciclo   = 'mensal';
+let _pedido  = null;
+let _planoAtual = 'free';
+
+// ── Formatação ─────────────────────────────────────────────────────
+const fmt  = v => 'R$ ' + (v/100).toLocaleString('pt-BR', {minimumFractionDigits:2});
+const fmtV = v => 'R$ ' + (v/100).toFixed(2).replace('.',',');
+
+// ── Toast ─────────────────────────────────────────────────────────
+function toast(msg, tipo = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${tipo}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+// ── Toggle ciclo ──────────────────────────────────────────────────
+function setCiclo(c) {
+  _ciclo = c;
+  document.getElementById('btn-mensal').classList.toggle('active', c === 'mensal');
+  document.getElementById('btn-anual').classList.toggle('active',  c === 'anual');
+  renderPlanos();
+}
+
+// ── Render planos ─────────────────────────────────────────────────
+function renderPlanos() {
+  const BS     = window.CH.BillingService;
+  const precos = BS.getPrecos();
+  const plans  = [
+    { id:'free',       icon:'🆓', cor:'#64748b', nome:'Grátis',     features:['PDV básico','Até 50 produtos','100 vendas/mês','1 usuário'], bloq:['Fiado','Delivery','BI Avançado','Multi-filial'] },
+    { id:'basico',     icon:'⭐', cor:'#3b82f6', nome:'Básico',      features:['PDV completo','500 produtos','Fiado + Financeiro','Relatórios + Telegram','5 usuários'], bloq:['Delivery','Comanda','BI Avançado','Multi-filial'], destaque:false },
+    { id:'premium',    icon:'🚀', cor:'#a78bfa', nome:'Premium',     features:['Tudo do Básico','Delivery + Comanda','BI Completo + Curva ABC','Aprovação de vendas','Usuários ilimitados'], bloq:['Multi-filial','White-label'], destaque:true },
+    { id:'enterprise', icon:'🏢', cor:'#f59e0b', nome:'Enterprise',  features:['Tudo do Premium','Multi-filial','White-label','API própria','Suporte prioritário'], bloq:[], destaque:false },
+  ];
+
+  document.getElementById('plans-grid').innerHTML = plans.map(p => {
+    const isCurrent = p.id === _planoAtual;
+    const info      = precos[p.id];
+    const valor     = info ? info[_ciclo] : 0;
+    const valorAnual= info ? info.anual : 0;
+
+    let precoHtml;
+    if (!info) {
+      precoHtml = `<div class="plan-preco"><span class="valor" style="font-size:1.3rem">Grátis</span></div>`;
+    } else if (p.id === 'enterprise') {
+      precoHtml = `<div class="plan-preco"><span class="valor" style="font-size:1.3rem">Sob consulta</span></div>`;
+    } else {
+      precoHtml = `<div class="plan-preco">
+        <span class="valor" style="color:${p.cor}">${fmtV(valor)}</span>
+        <span class="periodo">/${_ciclo === 'mensal' ? 'mês' : 'ano'}</span>
+        ${_ciclo === 'mensal' && valorAnual ? `<span class="anual">ou ${fmtV(valorAnual)}/ano (economia ${fmtV(valor*12 - valorAnual)})</span>` : ''}
+      </div>`;
+    }
+
+    const featHtml = [
+      ...p.features.map(f => `<li><span class="ok">✓</span>${f}</li>`),
+      ...p.bloq.map(f => `<li><span class="no">✗</span><span style="color:var(--muted)">${f}</span></li>`),
+    ].join('');
+
+    let btnHtml;
+    if (isCurrent) {
+      btnHtml = `<button class="plan-btn plan-btn-active" disabled>● Plano atual</button>`;
+    } else if (p.id === 'enterprise') {
+      btnHtml = `<button class="plan-btn plan-btn-enterprise" onclick="contatoEnterprise()">Falar com vendas</button>`;
+    } else if (!info) {
+      btnHtml = `<button class="plan-btn" style="background:rgba(100,116,139,.15);color:var(--muted);cursor:default" disabled>Plano gratuito</button>`;
+    } else {
+      btnHtml = `<button class="plan-btn plan-btn-upgrade" onclick="iniciarAssinatura('${p.id}')">
+        Assinar ${p.nome}
+      </button>`;
+    }
+
+    return `
+      <div class="plan-card ${isCurrent?'current':''} ${p.destaque?'destaque':''}">
+        <div class="plan-nome">${p.icon} ${p.nome}</div>
+        ${precoHtml}
+        <ul class="plan-features">${featHtml}</ul>
+        ${btnHtml}
+      </div>`;
+  }).join('');
+}
+
+// ── Assinatura ────────────────────────────────────────────────────
+async function iniciarAssinatura(planoId) {
+  const BS = window.CH.BillingService;
+  const chavePix = Store.getConfig()?.billing?.chavePix;
+
+  if (!chavePix) {
+    toast('Configure a chave PIX antes de gerar cobranças', 'err');
+    document.getElementById('config-pix-section').scrollIntoView({behavior:'smooth'});
+    document.getElementById('cfg-chave-pix').focus();
+    return;
+  }
+
+  const btn = document.querySelector(`.plan-btn-upgrade`);
+  if (btn) { btn.innerHTML = '<span class="spin"></span> Gerando PIX…'; btn.disabled = true; }
+
+  try {
+    _pedido = await BS.criarCobranca(planoId, _ciclo);
+    abrirModalPix(_pedido);
+    renderPendente();
+    toast('Cobrança PIX gerada!');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+  renderPlanos();
+}
+
+// ── Modal PIX ─────────────────────────────────────────────────────
+function abrirModalPix(pedido) {
+  const preco = window.CH.BillingService.getPrecos()[pedido.planoId];
+  const label = { basico:'Básico', premium:'Premium', enterprise:'Enterprise' }[pedido.planoId] || pedido.planoId;
+
+  document.getElementById('pix-modal-desc').textContent =
+    `Plano ${label} — ${_ciclo === 'mensal' ? 'Mensal' : 'Anual'}`;
+  document.getElementById('pix-valor').textContent = fmtV(pedido.valor);
+  document.getElementById('pix-codigo').textContent = pedido.pixPayload;
+
+  const exp = new Date(pedido.expiresAt);
+  document.getElementById('pix-expira').textContent =
+    `Válido até ${exp.toLocaleDateString('pt-BR')} às ${exp.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+
+  // Gera QR Code
+  const qrWrap = document.getElementById('qr-container');
+  qrWrap.innerHTML = '';
+  try {
+    new QRCode(qrWrap, {
+      text:          pedido.pixPayload,
+      width:         150,
+      height:        150,
+      correctLevel:  QRCode.CorrectLevel.M,
+    });
+  } catch(e) {
+    qrWrap.innerHTML = '<div style="color:#333;font-size:.65rem;padding:8px;text-align:center">QR indisponível<br>use Copia e Cola</div>';
+  }
+
+  // Admin: só mostra confirmar se tiver permissão
+  const role = window.CH.AuthService?.getRole?.();
+  const btnAdmin = document.getElementById('btn-confirmar-admin');
+  if (btnAdmin) btnAdmin.style.display = ['admin','adm','gerente'].includes(role) ? '' : 'none';
+
+  document.getElementById('pix-modal').style.display = 'flex';
+}
+
+function fecharModal() {
+  document.getElementById('pix-modal').style.display = 'none';
+}
+
+function reabrirPix() {
+  const p = Store.getConfig()?.billing?.pedidoPendente;
+  if (p) abrirModalPix(p);
+}
+
+function copiarPix() {
+  const code = document.getElementById('pix-codigo').textContent;
+  navigator.clipboard?.writeText(code).then(() => toast('Código copiado!')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = code; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('Código copiado!');
+  });
+}
+
+async function confirmarPgtoAdmin() {
+  if (!_pedido) return;
+  if (!confirm(`Confirmar pagamento do pedido #${_pedido.id.slice(0,8)}?`)) return;
+  try {
+    await window.CH.BillingService.confirmarPagamento(_pedido.id);
+    fecharModal();
+    toast('Pagamento confirmado! Plano atualizado.');
+    window.CH.SoundService?.approved?.();
+    _pedido = null;
+    renderPendente();
+    carregarAssinaturaAtual();
+    renderPlanos();
+  } catch(e) {
+    toast(e.message, 'err');
+  }
+}
+
+// ── Pendente ──────────────────────────────────────────────────────
+function renderPendente() {
+  const p   = Store.getConfig()?.billing?.pedidoPendente;
+  const box = document.getElementById('pendente-box');
+  if (!p) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  const preco = window.CH.BillingService.getPrecos()[p.planoId];
+  document.getElementById('pendente-desc').textContent =
+    `Plano ${p.planoId} — ${fmtV(p.valor)} — gerado em ${new Date(p.criadoEm).toLocaleString('pt-BR')}`;
+  _pedido = p;
+}
+
+// ── Histórico ─────────────────────────────────────────────────────
+function renderHistorico() {
+  const hist = Store.getConfig()?.billing?.historico || [];
+  const ult  = Store.getConfig()?.billing?.ultimoPagamento;
+  const todos = ult ? [ult, ...hist] : hist;
+  const wrap  = document.getElementById('historico-wrap');
+  if (!todos.length) {
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:.83rem;text-align:center;padding:20px">Nenhum pagamento registrado.</div>';
+    return;
+  }
+  wrap.innerHTML = todos.slice(0,10).map(p => `
+    <div class="hist-card">
+      <div class="hist-info">
+        <strong>Plano ${p.planoId?.charAt(0).toUpperCase() + p.planoId?.slice(1)} — ${p.ciclo === 'anual' ? 'Anual' : 'Mensal'}</strong>
+        <span>${p.pagoEm ? new Date(p.pagoEm).toLocaleDateString('pt-BR') : '—'} · ID: ${p.id?.slice(0,8)||'—'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="badge ${p.status === 'pago' ? 'badge-green' : 'badge-yellow'}">
+          ${p.status === 'pago' ? '✓ Pago' : '⏳ Aguardando'}
+        </span>
+        <span class="hist-val">${fmtV(p.valor||0)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Plano atual ───────────────────────────────────────────────────
+function carregarAssinaturaAtual() {
+  const ass = window.CH?.BillingService?.getAssinaturaAtual();
+  if (!ass) return;
+  _planoAtual = ass.plano;
+  const icons = { free:'🆓', basico:'⭐', premium:'🚀', enterprise:'🏢' };
+  document.getElementById('plan-icon').textContent  = icons[ass.plano] || '📦';
+  document.getElementById('plan-nome-atual').textContent = `Plano ${ass.label}`;
+  const precoInfo = window.CH.BillingService.getPrecos()[ass.plano];
+  document.getElementById('plan-desc-atual').textContent =
+    precoInfo ? `${fmtV(precoInfo.mensal)}/mês · ou ${fmtV(precoInfo.anual)}/ano` : 'Sem cobrança';
+}
+
+// ── Config PIX ────────────────────────────────────────────────────
+function salvarConfigPix() {
+  const chavePix      = document.getElementById('cfg-chave-pix').value.trim();
+  const nomeRecebedor = document.getElementById('cfg-nome-recebedor').value.trim();
+  const cidade        = document.getElementById('cfg-cidade').value.trim();
+  if (!chavePix) { toast('Informe a chave PIX', 'err'); return; }
+  window.CH.BillingService.configurarPix({ chavePix, nomeRecebedor, cidade });
+  toast('Configuração PIX salva!');
+}
+
+function carregarConfigPix() {
+  const cfg = Store.getConfig()?.billing || {};
+  const el  = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
+  el('cfg-chave-pix',      cfg.chavePix);
+  el('cfg-nome-recebedor', cfg.nomeRecebedor);
+  el('cfg-cidade',         cfg.cidade);
+}
+
+function contatoEnterprise() {
+  const msg = encodeURIComponent('Olá! Tenho interesse no plano Enterprise do CH Geladas PDV.');
+  window.open(`https://wa.me/5511999999999?text=${msg}`, '_blank');
+}
+
+// ── Boot ──────────────────────────────────────────────────────────
+function boot() {
+  if (!window.CH?.BillingService) {
+    document.body.innerHTML = '<div style="color:#ef4444;padding:40px;text-align:center">BillingService não disponível. Verifique os scripts.</div>';
+    return;
+  }
+
+  const role = window.CH?.AuthService?.getRole?.();
+  const isAdmin = ['admin','adm','gerente'].includes(role);
+
+  // Mostra config PIX só para admin
+  if (isAdmin) document.getElementById('config-pix-section').style.display = 'block';
+
+  // Info empresa
+  const sess = window.CH?.SaasService?.getSession?.();
+  if (sess?.empresaId) {
+    document.getElementById('empresa-sub').textContent = sess.empresaId + ' · ' + sess.nome;
+  }
+
+  carregarAssinaturaAtual();
+  renderPlanos();
+  renderPendente();
+  renderHistorico();
+  carregarConfigPix();
+
+  // Escuta confirmação de pagamento
+  EventBus.on('billing:confirmado', () => {
+    carregarAssinaturaAtual();
+    renderPlanos();
+    renderPendente();
+    renderHistorico();
+  });
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

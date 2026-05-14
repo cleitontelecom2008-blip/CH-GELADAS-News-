@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor — CH Geladas</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: .75rem; padding: 1rem; }
+  .card-title { font-size: .7rem; color: #64748b; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .75rem; }
+
+  .badge { display: inline-flex; align-items: center; gap: .3rem;
+    font-size: .72rem; font-weight: 600; padding: .2rem .6rem;
+    border-radius: 999px; }
+  .badge-green  { background: #052e16; color: #4ade80; }
+  .badge-yellow { background: #422006; color: #fbbf24; }
+  .badge-red    { background: #450a0a; color: #f87171; }
+  .badge-blue   { background: #082f49; color: #38bdf8; }
+  .badge-gray   { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+  .stat-val { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+  .stat-lbl { font-size: .7rem; color: #64748b; margin-top: .2rem; }
+
+  .log-line { font-size: .72rem; font-family: monospace; padding: .25rem 0;
+    border-bottom: 1px solid #1e293b; display: flex; gap: .5rem; }
+  .log-time { color: #475569; min-width: 5rem; }
+  .log-ok   { color: #4ade80; }
+  .log-err  { color: #f87171; }
+  .log-info { color: #38bdf8; }
+  .log-warn { color: #fbbf24; }
+
+  .queue-row { font-size: .7rem; padding: .35rem .5rem; border-radius: .4rem;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: .2rem; background: #0f172a; }
+
+  .btn { padding: .5rem 1rem; border-radius: .5rem; font-size: .8rem;
+    font-weight: 600; cursor: pointer; border: none; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn-green  { background: #166534; color: #4ade80; }
+  .btn-yellow { background: #713f12; color: #fbbf24; }
+  .btn-red    { background: #7f1d1d; color: #f87171; }
+  .btn-blue   { background: #0c4a6e; color: #38bdf8; }
+
+  #loginWrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  #monitorWrap { display: none; }
+
+  .pulse { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+  .online-dot { width: .6rem; height: .6rem; border-radius: 50%; display: inline-block; }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ── Login ─────────────────────────────────────────────── -->
+<div id="loginWrap">
+  <div class="card w-80 text-center">
+    <div class="text-2xl mb-1">📊</div>
+    <div class="font-bold text-lg mb-1">CH Monitor</div>
+    <div class="text-xs text-slate-500 mb-4">Acesso restrito a Administradores</div>
+    <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
+    <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
+    <button class="btn btn-green w-full" onclick="fazerLogin()">Entrar</button>
+    <div id="loginErr" class="text-red-400 text-xs mt-2 hidden">PIN inválido ou sem permissão de admin.</div>
+  </div>
+</div>
+
+<!-- ── Monitor ────────────────────────────────────────────── -->
+<div id="monitorWrap" class="p-4 max-w-5xl mx-auto pb-10">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <div class="text-lg font-bold">📊 CH Monitor</div>
+      <div class="text-xs text-slate-500" id="sessionInfo">—</div>
+    </div>
+    <div class="flex gap-2 items-center">
+      <span class="online-dot bg-emerald-400 pulse" id="onlineDot"></span>
+      <span class="text-xs text-slate-400" id="onlineLbl">Online</span>
+      <span class="text-xs text-slate-600 ml-2" id="clockLbl"></span>
+      <button class="btn btn-red text-xs ml-3" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <!-- KPIs linha 1 -->
+  <div class="grid grid-cols-2 gap-3 mb-3" style="grid-template-columns: repeat(4,1fr)">
+    <div class="card text-center">
+      <div class="stat-val text-emerald-400" id="kpiSyncOk">—</div>
+      <div class="stat-lbl">Sync OK hoje</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-val text-yellow-400" id="kpiSyncPend">—</div>
+      <div class="stat-lbl">Pendentes</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-val text-red-400" id="kpiSyncErr">—</div>
+      <div class="stat-lbl">Erros de sync</div>
+    </div>
+    <div class="card text-center">
+      <div class="stat-val text-blue-400" id="kpiAudit">—</div>
+      <div class="stat-lbl">Eventos hoje</div>
+    </div>
+  </div>
+
+  <!-- Linha 2: Sync + Backup -->
+  <div class="grid gap-3 mb-3" style="grid-template-columns: 1fr 1fr">
+
+    <!-- Fila de Sync -->
+    <div class="card">
+      <div class="card-title flex justify-between items-center">
+        <span>🔄 Fila de Sincronização</span>
+        <div class="flex gap-2">
+          <button class="btn btn-yellow text-xs" id="btnReenviar" onclick="reenviarErros()">Reenviar erros</button>
+          <button class="btn btn-blue text-xs" id="btnSync" onclick="forcSync()">Processar agora</button>
+        </div>
+      </div>
+      <div id="syncStatusBadge" class="mb-2"></div>
+      <div id="syncQueueList" class="max-h-44 overflow-y-auto"></div>
+    </div>
+
+    <!-- Backup -->
+    <div class="card">
+      <div class="card-title flex justify-between items-center">
+        <span>💾 Backup</span>
+        <button class="btn btn-green text-xs" id="btnBackup" onclick="forcBackup()">Fazer backup agora</button>
+      </div>
+      <div id="backupStatus" class="space-y-1"></div>
+    </div>
+  </div>
+
+  <!-- Linha 3: Usuários + Log tempo real -->
+  <div class="grid gap-3 mb-3" style="grid-template-columns: 1fr 1.8fr">
+
+    <!-- Usuários cadastrados -->
+    <div class="card">
+      <div class="card-title">👥 Usuários Ativos</div>
+      <div id="usersList" class="space-y-1 max-h-52 overflow-y-auto"></div>
+    </div>
+
+    <!-- Log em tempo real -->
+    <div class="card">
+      <div class="card-title flex justify-between">
+        <span>📡 Eventos em Tempo Real</span>
+        <button class="btn btn-red text-xs py-0" onclick="limparLog()">Limpar</button>
+      </div>
+      <div id="eventLog" class="max-h-52 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- Linha 4: Auditoria hoje -->
+  <div class="card">
+    <div class="card-title">🗒️ Auditoria — Últimos Eventos de Hoje</div>
+    <div id="auditList" class="max-h-60 overflow-y-auto"></div>
+  </div>
+
+</div>
+
+<!-- ── Scripts ─────────────────────────────────────────── -->
+<script src="core.js"></script>
+  <script src="./services/permissoesService.js"></script>
+<script src="./services/syncService.js"></script>
+<script src="./services/auditService.js"></script>
+<script src="./services/syncMonitor.js"></script>
+<script src="./services/backupService.js"></script>
+<script src="./services/userService.js"></script>
+<script>
+'use strict';
+(async function () {
+  // ── Aguarda window.CH estar pronto ──────────────────────────────
+  await new Promise(r => {
+    if (window.CH?.EventBus) return r();
+    const t = setInterval(() => { if (window.CH?.EventBus) { clearInterval(t); r(); } }, 50);
+  });
+
+  const { AuthService, UserService, SyncQueue, BackupService, AuditService, EventBus } = window.CH;
+
+  let _syncOkHoje = 0;
+  let _logLines   = [];
+
+  // ── Login ────────────────────────────────────────────────────────
+  window.fazerLogin = async function () {
+    const pin = document.getElementById('loginSenha').value.trim();
+    const err = document.getElementById('loginErr');
+    err.classList.add('hidden');
+
+    const ok = await AuthService.login(pin);
+    if (!ok || AuthService.getRole() !== 'admin') {
+      err.classList.remove('hidden');
+      AuthService.logout?.();
+      return;
+    }
+    iniciarMonitor();
+  };
+
+  window.sair = function () {
+    AuthService.logout();
+    location.reload();
+  };
+
+  // ── Verificar se já está logado como admin ───────────────────────
+  if (AuthService.isLogged() && AuthService.getRole() === 'admin') {
+    iniciarMonitor();
+  }
+
+  // ── Monitor principal ────────────────────────────────────────────
+  function iniciarMonitor() {
+    document.getElementById('loginWrap').style.display  = 'none';
+    document.getElementById('monitorWrap').style.display = 'block';
+
+    document.getElementById('sessionInfo').textContent =
+      `Logado como: ${AuthService.getNome?.() || 'Admin'} · ${AuthService.getRole()}`;
+
+    _iniciarRelogio();
+    _atualizarTudo();
+    _registrarEventos();
+    setInterval(_atualizarTudo, 3000);
+    _atualizarOnline();
+  }
+
+  // ── Atualização periódica ────────────────────────────────────────
+  function _atualizarTudo() {
+    _atualizarSync();
+    _atualizarBackup();
+    _atualizarUsuarios();
+    _atualizarAuditoria();
+  }
+
+  // ── Sync ─────────────────────────────────────────────────────────
+  function _atualizarSync() {
+    const s = SyncQueue.getStatus();
+
+    document.getElementById('kpiSyncOk').textContent   = _syncOkHoje;
+    document.getElementById('kpiSyncPend').textContent = s.pendentes;
+    document.getElementById('kpiSyncErr').textContent  = s.erros;
+
+    // Badge de estado geral
+    let badge, txt;
+    if (s.erros > 0) {
+      badge = 'badge-red';   txt = `🔴 ${s.erros} erro(s)`;
+    } else if (s.pendentes > 0 || s.processando > 0) {
+      badge = 'badge-yellow'; txt = `🟡 ${s.pendentes} pendente(s)`;
+    } else {
+      badge = 'badge-green';  txt = '🟢 Sincronizado';
+    }
+    document.getElementById('syncStatusBadge').innerHTML =
+      `<span class="badge ${badge}">${txt}</span>
+       <span class="text-xs text-slate-500 ml-2">Total na fila: ${s.total}</span>`;
+
+    // Lista dos últimos itens com erro ou pendentes
+    const relevantes = s.itens
+      .filter(i => i.status === 'erro' || i.status === 'pendente')
+      .slice(-10)
+      .reverse();
+
+    const container = document.getElementById('syncQueueList');
+    if (relevantes.length === 0) {
+      container.innerHTML = '<div class="text-xs text-slate-600 text-center py-2">Nenhum item pendente</div>';
+      return;
+    }
+    container.innerHTML = relevantes.map(i => {
+      const cor = i.status === 'erro' ? 'text-red-400' : 'text-yellow-400';
+      const ts  = i.criadoEm ? new Date(i.criadoEm).toLocaleTimeString('pt-BR') : '—';
+      return `<div class="queue-row">
+        <span class="${cor} font-mono">${i.status}</span>
+        <span class="text-slate-400">${i.colecao || '—'}</span>
+        <span class="text-slate-600">${ts}</span>
+        <span class="text-slate-500">t:${i.tentativas ?? 0}</span>
+      </div>`;
+    }).join('');
+  }
+
+  window.reenviarErros = function () {
+    const n = SyncQueue.reenviarErros();
+    _log('info', `Reenvio forçado: ${n} item(ns)`);
+    _atualizarSync();
+  };
+
+  window.forcSync = function () {
+    SyncQueue.processar();
+    _log('info', 'Processamento de fila forçado');
+  };
+
+  // ── Backup ───────────────────────────────────────────────────────
+  function _atualizarBackup() {
+    const s = BackupService.getStatus();
+    const ul = s.ultimoBackup ? new Date(s.ultimoBackup).toLocaleString('pt-BR') : 'Nunca';
+    const fezHoje = s.fezHoje;
+    const fbOk    = s.fbOk;
+
+    document.getElementById('backupStatus').innerHTML = `
+      <div class="flex justify-between text-sm">
+        <span class="text-slate-400">Último backup</span>
+        <span class="font-mono text-xs ${fezHoje ? 'text-emerald-400' : 'text-yellow-400'}">${ul}</span>
+      </div>
+      <div class="flex justify-between text-sm mt-1">
+        <span class="text-slate-400">Fez hoje?</span>
+        <span class="badge ${fezHoje ? 'badge-green' : 'badge-yellow'}">${fezHoje ? '✓ Sim' : '✗ Não'}</span>
+      </div>
+      <div class="flex justify-between text-sm mt-1">
+        <span class="text-slate-400">Firestore</span>
+        <span class="badge ${fbOk === true ? 'badge-green' : fbOk === false ? 'badge-red' : 'badge-gray'}">
+          ${fbOk === true ? '✓ OK' : fbOk === false ? '✗ Falhou' : '—'}
+        </span>
+      </div>
+      <div class="flex justify-between text-sm mt-1">
+        <span class="text-slate-400">Total realizados</span>
+        <span class="text-blue-400 font-bold">${s.totalBackups}</span>
+      </div>
+      ${s.stats?.estoque != null ? `
+      <div class="flex justify-between text-sm mt-2 border-t border-slate-700 pt-2">
+        <span class="text-slate-500">Estoque</span><span class="text-slate-400">${s.stats.estoque} itens</span>
+      </div>
+      <div class="flex justify-between text-sm">
+        <span class="text-slate-500">Vendas</span><span class="text-slate-400">${s.stats.vendas} registros</span>
+      </div>` : ''}
+    `;
+  }
+
+  window.forcBackup = async function () {
+    const btn = document.getElementById('btnBackup');
+    btn.disabled = true; btn.textContent = 'Fazendo...';
+    _log('info', 'Backup manual iniciado...');
+    try {
+      await BackupService.fazerBackup(false);
+      _log('ok', 'Backup concluído com sucesso');
+    } catch (e) {
+      _log('err', 'Erro no backup: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = 'Fazer backup agora';
+    _atualizarBackup();
+  };
+
+  // ── Usuários ─────────────────────────────────────────────────────
+  function _atualizarUsuarios() {
+    const users = UserService.getUsuarios({ apenasAtivos: true });
+    const ROLE_BADGE = {
+      admin:      'badge-red',
+      gerente:    'badge-blue',
+      operador:   'badge-green',
+      entregador: 'badge-yellow',
+      pdv:        'badge-gray',
+    };
+    document.getElementById('usersList').innerHTML = users.length === 0
+      ? '<div class="text-xs text-slate-600">Nenhum usuário cadastrado</div>'
+      : users.map(u => `
+          <div class="flex items-center justify-between py-1 border-b border-slate-700">
+            <span class="text-sm">${u.nome}</span>
+            <span class="badge ${ROLE_BADGE[u.role] || 'badge-gray'}">${u.role}</span>
+          </div>`).join('');
+  }
+
+  // ── Auditoria ────────────────────────────────────────────────────
+  function _atualizarAuditoria() {
+    const hoje = AuditService.getHoje?.() || AuditService.getHistorico?.() || [];
+    document.getElementById('kpiAudit').textContent = hoje.length;
+
+    const ultimos = [...hoje].reverse().slice(0, 30);
+    document.getElementById('auditList').innerHTML = ultimos.length === 0
+      ? '<div class="text-xs text-slate-600 text-center py-2">Sem eventos hoje</div>'
+      : ultimos.map(ev => {
+          const cor = ev.acao?.includes('delete') || ev.acao?.includes('deletar') ? 'text-red-400'
+                    : ev.acao?.includes('venda') ? 'text-emerald-400'
+                    : ev.acao?.includes('login') ? 'text-blue-400'
+                    : 'text-slate-400';
+          return `<div class="log-line">
+            <span class="log-time">${ev.hora || '—'}</span>
+            <span class="${cor} min-w-20">${ev.acao || '—'}</span>
+            <span class="text-slate-500 min-w-20">${ev.modulo || '—'}</span>
+            <span class="text-slate-400">${ev.usuario || '—'}</span>
+            <span class="text-slate-600 truncate max-w-48">${ev.resumo || ''}</span>
+          </div>`;
+        }).join('');
+  }
+
+  // ── Eventos em tempo real ─────────────────────────────────────────
+  function _registrarEventos() {
+    EventBus.on('sync:ok',            (col) => { _syncOkHoje++; _log('ok',   `sync:ok — ${col}`); });
+    EventBus.on('sync:error',         (d)   => _log('err',  `sync:error — ${d?.colecao} (t:${d?.tentativa})`));
+    EventBus.on('venda:finalizada',   (v)   => _log('ok',   `venda:finalizada — R$ ${(v?.total||0).toFixed(2)}`));
+    EventBus.on('venda:cancelada',    (d)   => _log('warn', `venda:cancelada — id:${d?.vendaId}`));
+    EventBus.on('auth:login',         (d)   => _log('info', `auth:login — role: ${d?.role}`));
+    EventBus.on('firebase:ready',     ()    => _log('info', 'firebase:ready'));
+    EventBus.on('backup:concluido',   (d)   => _log('ok',   `backup:concluido — Firestore: ${d?.fbOk ? 'sim' : 'não'}`));
+    EventBus.on('estoque:atualizado', ()    => _log('info', 'estoque:atualizado'));
+
+    window.addEventListener('online',  () => { _atualizarOnline(); _log('ok',   'Voltou online'); });
+    window.addEventListener('offline', () => { _atualizarOnline(); _log('warn', 'Ficou offline'); });
+  }
+
+  function _atualizarOnline() {
+    const online = navigator.onLine;
+    const dot = document.getElementById('onlineDot');
+    const lbl = document.getElementById('onlineLbl');
+    dot.className = `online-dot ${online ? 'bg-emerald-400 pulse' : 'bg-red-400'}`;
+    lbl.textContent = online ? 'Online' : 'Offline';
+  }
+
+  // ── Log ──────────────────────────────────────────────────────────
+  function _log(tipo, msg) {
+    const agora = new Date().toLocaleTimeString('pt-BR');
+    _logLines.unshift({ tipo, msg, agora });
+    if (_logLines.length > 100) _logLines.pop();
+    _renderLog();
+  }
+
+  function _renderLog() {
+    const COR = { ok: 'log-ok', err: 'log-err', info: 'log-info', warn: 'log-warn' };
+    document.getElementById('eventLog').innerHTML = _logLines.map(l =>
+      `<div class="log-line">
+         <span class="log-time">${l.agora}</span>
+         <span class="${COR[l.tipo] || 'log-info'}">${l.msg}</span>
+       </div>`
+    ).join('');
+  }
+
+  window.limparLog = function () { _logLines = []; _renderLog(); };
+
+  // ── Relógio ──────────────────────────────────────────────────────
+  function _iniciarRelogio() {
+    function tick() {
+      document.getElementById('clockLbl').textContent =
+        new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
+    }
+    tick();
+    setInterval(tick, 1000);
+  }
+
+})();
+</script>
+</body>
+</html>

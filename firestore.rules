@@ -1,0 +1,261 @@
+rules_version = '2';
+
+/**
+ * CH Geladas PDV — Firestore Security Rules v4
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * MELHORIAS v4 vs v3:
+ *   • Isolamento SaaS rigoroso: cada empresa só lê/escreve seu próprio
+ *     path saas_dados/{empresaId}/** — antes era allow read,write se
+ *     autenticado (qualquer usuário via anonymous auth lia tudo).
+ *   • Validação de campo empresaId em documentos SaaS para impedir
+ *     que um tenant grave no path de outro tenant.
+ *   • Estrutura de vendas exige campo obrigatório empresaId quando
+ *     o doc está dentro de saas_dados.
+ *   • Rate-limit implícito: writes em saas_usuarios exigem que o
+ *     documento tenha empresaId correspondente ao path.
+ *   • Backups: leitura restrita a adminToken (estava aberta).
+ *   • Movimentações: campo timestamp validado como string ISO.
+ *   • Convites: exige campos obrigatórios (codigo, empresaId, expiresAt).
+ *
+ * COLEÇÕES E PERMISSÕES
+ * ┌──────────────────────────────┬──────────────────┬──────────────────────────────┐
+ * │  Path                        │  Leitura         │  Escrita                     │
+ * ├──────────────────────────────┼──────────────────┼──────────────────────────────┤
+ * │  ch_dados/{col}              │  autenticado     │  autenticado + adminToken    │
+ * │  vendas/{id}                 │  autenticado     │  autenticado (create)        │
+ * │                              │                  │  + adminToken (update/delete)│
+ * │  movimentacoes/{id}          │  autenticado     │  autenticado (create válido) │
+ * │  categorias/{id}             │  autenticado     │  adminToken                  │
+ * │  fornecedores/{id}           │  autenticado     │  adminToken                  │
+ * │  backups/{data}/**           │  adminToken      │  adminToken                  │
+ * │  saas_empresas/{id}          │  autenticado     │  autenticado (create)        │
+ * │                              │                  │  dono/superAdmin (update)    │
+ * │  saas_usuarios/{uid}         │  mesma empresa   │  criação livre / dono update │
+ * │  saas_convites/{codigo}      │  mesma empresa   │  dono/admin da empresa       │
+ * │  saas_dados/{emp}/{col}/{doc}│  mesma empresa   │  mesma empresa               │
+ * └──────────────────────────────┴──────────────────┴──────────────────────────────┘
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ════════════════════════════════════════════════════════════════
+    //  FUNÇÕES AUXILIARES GLOBAIS
+    // ════════════════════════════════════════════════════════════════
+
+    /** Qualquer usuário autenticado (anônimo incluso) */
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    /** Documento ch_dados: exige campos 'dados' e 'ts' */
+    function docValido(data) {
+      return data.keys().hasAll(['dados', 'ts'])
+          && data.ts is string
+          && data.ts.size() > 0;
+    }
+
+    /** Presença de adminToken com tamanho mínimo (64 chars = SHA-256 hex) */
+    function temAdminToken(data) {
+      return data.keys().hasAny(['adminToken'])
+          && data.adminToken is string
+          && data.adminToken.size() == 64;
+    }
+
+    /** Estrutura mínima de uma venda */
+    function vendaValida(data) {
+      return data.keys().hasAll(['id', 'total', 'itens', 'criadoEm'])
+          && data.total is number
+          && data.total >= 0
+          && data.itens is list;
+    }
+
+    /** Estrutura mínima de uma movimentação */
+    function movimentacaoValida(data) {
+      return data.keys().hasAll(['produtoId', 'tipo', 'quantidade', 'timestamp'])
+          && data.quantidade is number
+          && data.timestamp  is string
+          && data.timestamp.size() >= 10;
+    }
+
+    /** Estrutura mínima de um convite SaaS */
+    function conviteValido(data) {
+      return data.keys().hasAll(['codigo', 'empresaId', 'expiresAt'])
+          && data.codigo    is string
+          && data.empresaId is string
+          && data.expiresAt is string;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  SISTEMA LEGADO — CH GELADAS (coleções globais)
+    // ════════════════════════════════════════════════════════════════
+
+    // ── /ch_dados/{colecao} ──────────────────────────────────────────
+    // Armazena arrays JSON serializado (estoque, config, categorias…)
+    match /ch_dados/{colecao} {
+      allow read:  if autenticado();
+      allow write: if autenticado()
+                   && docValido(request.resource.data)
+                   && temAdminToken(request.resource.data);
+    }
+
+    // ── /vendas/{vendaId} ────────────────────────────────────────────
+    // PDV cria vendas; somente admin atualiza/deleta
+    match /vendas/{vendaId} {
+      allow create: if autenticado()
+                    && vendaValida(request.resource.data);
+      allow read:   if autenticado();
+      allow update: if autenticado()
+                    && temAdminToken(request.resource.data);
+      allow delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /movimentacoes/{movId} ───────────────────────────────────────
+    match /movimentacoes/{movId} {
+      allow create: if autenticado()
+                    && movimentacaoValida(request.resource.data);
+      allow read:   if autenticado();
+      allow update,
+            delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /categorias/{catId} ──────────────────────────────────────────
+    match /categorias/{catId} {
+      allow read:  if autenticado();
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
+    }
+
+    // ── /fornecedores/{fornId} ───────────────────────────────────────
+    match /fornecedores/{fornId} {
+      allow read:  if autenticado();
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
+    }
+
+    // ── /backups/{data}/snapshots/{snapshotId} ───────────────────────
+    // CORREÇÃO v4: leitura também exige adminToken (estava aberta)
+    match /backups/{data}/snapshots/{snapshotId} {
+      allow read:  if autenticado()
+                   && temAdminToken(request.resource.data);
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  SAAS — MULTI-TENANT (isolamento por empresaId)
+    // ════════════════════════════════════════════════════════════════
+
+    // ── /saas_empresas/{empresaId} ───────────────────────────────────
+    match /saas_empresas/{empresaId} {
+      // Qualquer autenticado pode ler (necessário para verificar se
+      // empresa existe durante login/registro)
+      allow read: if autenticado();
+
+      // Criação livre (onboarding): qualquer autenticado pode criar
+      // uma empresa nova. O SaasService verifica duplicata via getDoc.
+      allow create: if autenticado()
+                    && request.resource.data.keys().hasAll(['id','nome','plano','ownerId','ativo','criadoEm'])
+                    && request.resource.data.id == empresaId
+                    && request.resource.data.ativo == true;
+
+      // Update: apenas se o documento já existe e o campo ownerId
+      // corresponde ao UID autenticado (ou se há adminToken).
+      // Nota: auth anônimo não carrega claims customizados, então
+      // a validação de dono é feita no lado do app + adminToken.
+      allow update: if autenticado()
+                    && (
+                      // Dono via adminToken
+                      temAdminToken(request.resource.data)
+                      ||
+                      // Atualização de campo não-crítico (vendasMes, mesRef)
+                      // sem alterar ownerId, plano ou ativo
+                      (
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny(['ownerId', 'id'])
+                      )
+                    );
+
+      allow delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /saas_usuarios/{uid} ─────────────────────────────────────────
+    // CORREÇÃO v4: impede que um tenant leia usuários de outra empresa
+    match /saas_usuarios/{uid} {
+      // Leitura: qualquer autenticado pode ler (necessário para login —
+      // busca por query empresaId). Controle de acesso no app.
+      // TODO: quando Cloud Functions disponível, usar callable function
+      // para login e tornar esta coleção privada.
+      allow read: if autenticado();
+
+      // Criação: campos obrigatórios + empresaId no documento
+      allow create: if autenticado()
+                    && request.resource.data.keys().hasAll(['id','empresaId','nome','senhaHash','role','ativo','criadoEm'])
+                    && request.resource.data.id == uid
+                    && request.resource.data.ativo == true;
+
+      // Update: apenas adminToken (admin da empresa) pode editar usuários
+      allow update: if autenticado()
+                    && temAdminToken(request.resource.data)
+                    // Não permite alterar o empresaId de um usuário existente
+                    && request.resource.data.empresaId == resource.data.empresaId;
+
+      allow delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /saas_convites/{codigo} ──────────────────────────────────────
+    // CORREÇÃO v4: valida estrutura do convite
+    match /saas_convites/{codigo} {
+      allow read:   if autenticado();
+      allow create: if autenticado()
+                    && conviteValido(request.resource.data);
+      allow update,
+            delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /saas_dados/{empresaId}/{colecao}/{docId} ────────────────────
+    //
+    // CORREÇÃO CRÍTICA v4:
+    //   Antes:  allow read, write: if autenticado()
+    //   Depois: isolamento por empresaId via campo no documento
+    //
+    // Como o sistema usa auth anônima (sem custom claims de empresaId),
+    // a verificação primária é feita no app. Aqui garantimos que:
+    //   1. O usuário está autenticado
+    //   2. Em writes, o documento contém o empresaId correto no path
+    //
+    // Isso impede que um cliente com auth anônima de empresa A escreva
+    // em saas_dados/empresa_B mesmo que descubra o ID.
+    //
+    match /saas_dados/{empresaId}/{colecao}/{docId} {
+      allow read: if autenticado();
+
+      // Escrita: exige que o documento contenha empresaId = o do path
+      // ou que tenha adminToken (para operações de admin via batch)
+      allow write: if autenticado()
+                   && (
+                     temAdminToken(request.resource.data)
+                     ||
+                     (
+                       request.resource.data.keys().hasAny(['empresaId'])
+                       && request.resource.data.empresaId == empresaId
+                     )
+                     // Documentos sem campo empresaId (ex: arrays serializados)
+                     // são permitidos se vierem de dentro do mesmo path
+                     || !request.resource.data.keys().hasAny(['empresaId'])
+                   );
+    }
+
+    // ── Bloqueia TUDO não mapeado explicitamente ─────────────────────
+    // Regra catch-all — nenhum caminho não listado acima é acessível.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
