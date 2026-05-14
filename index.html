@@ -521,6 +521,12 @@ body.is-admin .valid-only { display: block; }
       <div class="app-desc">Nova empresa SaaS</div>
     </a>
 
+    <a href="saas-login.html" class="app-card c-blue" data-modulo="saas_login" style="animation-delay:.12s">
+      <div class="app-icon">🔑</div>
+      <div class="app-name">Login SaaS</div>
+      <div class="app-desc">Acesso de cliente</div>
+    </a>
+
     <!-- ESTOQUE -->
     <a href="estoque.html" class="app-card c-green" data-modulo="estoque" style="animation-delay:.1s;display:none">
       <div class="app-badge" id="badgeEstoque"></div>
@@ -1630,13 +1636,28 @@ function showToast(title, sub='', type='success') {
    INIT CHECK — se já logado
 ══════════════════════════════════ */
 window.addEventListener('DOMContentLoaded', () => {
-  if (AuthService.isLogged()) {
+  // ── Detecta sessão SaaS (clientes) além do auth local (PIN) ──
+  const _saasSess = window.CH?.SaasService?.getSession?.();
+  if (_saasSess && !AuthService.isLogged()) {
+    // Mapeia role SaaS → role local para permissões de UI
+    const _saasRoleMap = { dono:'adm', gerente:'gerente', caixa:'operador', colaborador:'colaborador' };
+    const _saasRole = _saasRoleMap[_saasSess.role] || 'colaborador';
+    // Injeta sessão temporária no AuthService para que _aplicarPermissoesHub funcione
+    AuthService._saasInject?.(_saasRole);
+  }
+
+  if (AuthService.isLogged() || _saasSess) {
     document.getElementById('lock').style.display = 'none';
     document.getElementById('hub').classList.add('show');
-    const _role2 = AuthService.getRole();
+    const _role2 = AuthService.getRole() || (_saasSess?.role === 'dono' ? 'adm' : 'colaborador');
     if (['adm','admin'].includes(_role2)) document.body.classList.add('is-admin');
     if (_role2 === 'controlador') document.body.classList.add('is-controlador');
     if (_role2 === 'validador')   document.body.classList.add('is-validador');
+    // Mostra nome/empresa SaaS na topbar se sessão SaaS
+    if (_saasSess) {
+      const _topNome = document.getElementById('topNome');
+      if (_topNome) _topNome.textContent = _saasSess.nome + (_saasSess.nomeEmpresa ? ` · ${_saasSess.nomeEmpresa}` : '');
+    }
     iniciarHub();
     setTimeout(_aplicarPermissoesHub, 100);
 

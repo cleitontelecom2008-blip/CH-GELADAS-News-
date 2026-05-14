@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#04060d">
+<title>Entrar — CH Geladas PDV</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+*  { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif;
+       min-height:100vh; margin:0; display:flex; align-items:center; justify-content:center; padding:1rem; }
+
+.card { background:rgba(15,23,42,.95); border:1px solid rgba(255,255,255,.08);
+        border-radius:2rem; padding:2rem 1.75rem; width:min(100%,420px);
+        box-shadow:0 32px 80px rgba(0,0,0,.6); }
+
+.logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; color:#fff; margin-bottom:.15rem; }
+.sub  { font-size:.65rem; color:#475569; font-weight:700; text-transform:uppercase;
+        letter-spacing:.1em; margin-bottom:2rem; }
+
+label { font-size:.68rem; color:#94a3b8; font-weight:600; text-transform:uppercase;
+        letter-spacing:.06em; display:block; margin-bottom:.4rem; margin-top:1rem; }
+
+input { width:100%; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+        border-radius:.875rem; color:#f1f5f9; font-family:'DM Sans',sans-serif;
+        font-size:.85rem; padding:.9rem 1rem; outline:none; transition:border-color .2s; }
+input:focus { border-color:#3b82f6; }
+input::placeholder { color:#475569; }
+
+.btn-primary { width:100%; padding:1.1rem; margin-top:1.5rem;
+               background:linear-gradient(135deg,#1d4ed8,#1e40af);
+               color:#fff; border:none; border-radius:1.25rem;
+               font-family:'Syne',sans-serif; font-weight:800; font-size:.85rem;
+               letter-spacing:.04em; text-transform:uppercase; cursor:pointer;
+               transition:all .2s; box-shadow:0 8px 24px rgba(29,78,216,.3); }
+.btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 12px 32px rgba(29,78,216,.4); }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+
+.erro { font-size:.72rem; color:#f87171; font-weight:700;
+        min-height:1.2rem; margin-top:.75rem; text-align:center; }
+
+.links { display:flex; justify-content:space-between; margin-top:1.5rem;
+         font-size:.68rem; color:#475569; }
+.links a { color:#60a5fa; text-decoration:none; font-weight:600; }
+.links a:hover { color:#93c5fd; }
+
+/* busca de empresa */
+.search-row { display:flex; gap:.5rem; align-items:flex-end; }
+.search-row input { flex:1; }
+.btn-buscar { padding:.9rem 1rem; background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3);
+              border-radius:.875rem; color:#60a5fa; font-size:.8rem; font-weight:700;
+              cursor:pointer; white-space:nowrap; transition:all .2s; }
+.btn-buscar:hover { background:rgba(59,130,246,.25); }
+
+.empresa-result { margin-top:.5rem; background:rgba(255,255,255,.04);
+                  border:1px solid rgba(255,255,255,.08); border-radius:.875rem; padding:.875rem 1rem;
+                  font-size:.78rem; display:none; }
+.empresa-result.show { display:block; }
+.emp-nome { font-weight:700; color:#f1f5f9; margin-bottom:.2rem; }
+.emp-id   { font-size:.65rem; color:#64748b; font-family:monospace; }
+
+/* plano badge */
+.plano-badge { display:inline-block; padding:.15rem .5rem; border-radius:.375rem; font-size:.6rem;
+               font-weight:800; text-transform:uppercase; letter-spacing:.06em; margin-left:.5rem; }
+.pb-free    { background:rgba(100,116,139,.2); color:#94a3b8; }
+.pb-basico  { background:rgba(59,130,246,.2);  color:#60a5fa; }
+.pb-premium { background:rgba(167,139,250,.2); color:#a78bfa; }
+
+.spinner { display:inline-block; width:1rem; height:1rem; border:2px solid rgba(255,255,255,.3);
+           border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div style="text-align:center;margin-bottom:1.5rem">
+    <div style="font-size:2.5rem;margin-bottom:.5rem">🍺</div>
+    <div class="logo">CH Geladas</div>
+    <div class="sub">Acesso ao PDV</div>
+  </div>
+
+  <!-- PASSO 1: busca empresa -->
+  <div id="passo1">
+    <label>Buscar empresa pelo nome <span style="color:#ef4444">*</span></label>
+    <div class="search-row">
+      <input id="buscaNome" type="text" placeholder="Ex: Depósito do João" autocomplete="off"
+             oninput="limparResultado()" onkeydown="if(event.key==='Enter')buscarEmpresa()">
+      <button class="btn-buscar" onclick="buscarEmpresa()">
+        <i class="fas fa-search"></i> Buscar
+      </button>
+    </div>
+
+    <div id="resultadoEmpresa" class="empresa-result">
+      <div class="emp-nome" id="resNome">—</div>
+      <div class="emp-id" id="resId">—</div>
+    </div>
+
+    <div id="erroBusca" class="erro"></div>
+
+    <p style="font-size:.65rem;color:#475569;margin-top:1rem;text-align:center">
+      Ou, se você já sabe o ID da empresa:
+    </p>
+    <label>ID da empresa (opcional)</label>
+    <input id="empresaId" type="text" placeholder="ex: deposito_joao_ab12" autocomplete="off">
+  </div>
+
+  <!-- PASSO 2: credenciais -->
+  <div id="passo2">
+    <label>Usuário <span style="color:#ef4444">*</span></label>
+    <input id="loginNome" type="text" autocomplete="username" placeholder="Seu nome de usuário"
+           onkeydown="if(event.key==='Enter')document.getElementById('loginSenha').focus()">
+
+    <label>Senha <span style="color:#ef4444">*</span></label>
+    <input id="loginSenha" type="password" autocomplete="current-password" placeholder="Sua senha"
+           onkeydown="if(event.key==='Enter')doLogin()">
+
+    <div id="erroLogin" class="erro"></div>
+
+    <button id="btnEntrar" class="btn-primary" onclick="doLogin()">
+      Entrar
+    </button>
+  </div>
+
+  <div class="links">
+    <a href="saas-register.html">Cadastrar empresa</a>
+    <a href="index.html">Acesso local</a>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script src="./services/saasService.js"></script>
+<script>
+'use strict';
+
+// empresa selecionada (pode vir da busca ou do campo ID manual)
+let _empresaSelecionada = null;
+
+/* ── Busca empresa por nome ────────────────────────────────────────── */
+async function buscarEmpresa() {
+  const termo = document.getElementById('buscaNome').value.trim();
+  const errEl = document.getElementById('erroBusca');
+  errEl.textContent = '';
+
+  if (!termo || termo.length < 2) {
+    errEl.textContent = 'Digite ao menos 2 caracteres.';
+    return;
+  }
+
+  errEl.innerHTML = '<span class="spinner"></span> Buscando...';
+
+  try {
+    const SS = window.CH?.SaasService;
+    if (!SS) throw new Error('Serviço indisponível');
+
+    // Usa a função de listagem pública (sem superAdmin) — busca por nome
+    const resultado = await SS.buscarEmpresaPorNome(termo);
+
+    if (!resultado) {
+      errEl.textContent = 'Empresa não encontrada. Verifique o nome.';
+      document.getElementById('resultadoEmpresa').classList.remove('show');
+      _empresaSelecionada = null;
+      return;
+    }
+
+    errEl.textContent = '';
+    _empresaSelecionada = resultado;
+    document.getElementById('empresaId').value = resultado.id;
+
+    const planoCls = { free:'pb-free', basico:'pb-basico', premium:'pb-premium' }[resultado.plano] || 'pb-free';
+    const planoNome = { free:'Grátis', basico:'Básico', premium:'Premium', enterprise:'Enterprise' }[resultado.plano] || resultado.plano;
+
+    document.getElementById('resNome').innerHTML =
+      resultado.nome + `<span class="plano-badge ${planoCls}">${planoNome}</span>`;
+    document.getElementById('resId').textContent = 'ID: ' + resultado.id;
+    document.getElementById('resultadoEmpresa').classList.add('show');
+    document.getElementById('loginNome').focus();
+
+  } catch (e) {
+    errEl.textContent = e.message || 'Erro ao buscar empresa.';
+  }
+}
+
+function limparResultado() {
+  document.getElementById('resultadoEmpresa').classList.remove('show');
+  _empresaSelecionada = null;
+}
+
+/* ── Login ─────────────────────────────────────────────────────────── */
+async function doLogin() {
+  const errEl    = document.getElementById('erroLogin');
+  const btnEl    = document.getElementById('btnEntrar');
+  errEl.textContent = '';
+
+  // Resolve empresaId: campo manual ou resultado da busca
+  const empresaId = document.getElementById('empresaId').value.trim() || _empresaSelecionada?.id;
+  const nome      = document.getElementById('loginNome').value.trim();
+  const senha     = document.getElementById('loginSenha').value.trim();
+
+  if (!empresaId) { errEl.textContent = 'Informe ou busque a empresa.'; return; }
+  if (!nome)      { errEl.textContent = 'Informe seu nome de usuário.';  return; }
+  if (!senha)     { errEl.textContent = 'Informe sua senha.';             return; }
+
+  btnEl.disabled = true;
+  btnEl.innerHTML = '<span class="spinner"></span> Entrando...';
+
+  try {
+    const SS = window.CH?.SaasService;
+    if (!SS) throw new Error('Serviço SaaS não carregado.');
+
+    await SS.login(empresaId, nome, senha);
+
+    // Redireciona para o hub
+    window.location.href = 'index.html';
+
+  } catch (e) {
+    errEl.textContent = e.message || 'Erro ao entrar. Tente novamente.';
+    btnEl.disabled = false;
+    btnEl.textContent = 'Entrar';
+    document.getElementById('loginSenha').value = '';
+    document.getElementById('loginSenha').focus();
+  }
+}
+
+/* ── Se já tem sessão SaaS ativa, vai direto pro hub ──────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  const sess = window.CH?.SaasService?.getSession?.();
+  if (sess?.empresaId) {
+    window.location.replace('index.html');
+  }
+  document.getElementById('buscaNome').focus();
+});
+</script>
+</body>
+</html>

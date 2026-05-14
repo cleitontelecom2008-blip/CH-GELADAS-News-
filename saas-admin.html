@@ -262,6 +262,9 @@ function renderLista() {
           <button class="btn-sm btn-info" onclick="gerarConviteAdmin('${e.id}','colaborador')">
             <i class="fas fa-ticket-alt mr-1"></i>Gerar Convite
           </button>
+          <button class="btn-sm" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff" onclick="entrarComoEmpresa('${e.id}')">
+            <i class="fas fa-sign-in-alt"></i> Entrar
+          </button>
         </div>
       </div>
     </div>`;
@@ -277,6 +280,17 @@ function toggleCard(empresaId) {
   if (!open) body.style.display = 'block';
 }
 
+
+async function entrarComoEmpresa(empresaId) {
+  try {
+    const SS = _SS();
+    await SS.enterEmpresa(empresaId);
+    // Redireciona para o hub do PDV com contexto da empresa carregado
+    window.location.href = 'index.html';
+  } catch (e) {
+    alert('Erro ao entrar na empresa: ' + e.message);
+  }
+}
 async function mudarPlano(empresaId, plano) {
   try {
     await _SS().atualizarPlano(empresaId, plano);
