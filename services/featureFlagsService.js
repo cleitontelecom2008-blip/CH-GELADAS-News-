@@ -142,8 +142,11 @@
 
   // ── Plano atual ───────────────────────────────────────────────────
   function planoAtual() {
-    // 1. SaasService com sessão ativa
+    // 0. SuperAdmin (dono da plataforma) → acesso enterprise total, sem restrições
     const SaaS = window.CH?.SaasService;
+    if (SaaS?.isSuperAdmin?.()) return 'enterprise';
+
+    // 1. SaasService com sessão ativa
     if (SaaS?.getSession) {
       const sess = SaaS.getSession();
       if (sess?.plano) return sess.plano;
@@ -153,6 +156,8 @@
       const sessStr = sessionStorage.getItem('SAAS_SESSION');
       if (sessStr) {
         const sess = JSON.parse(sessStr);
+        // SuperAdmin via sessionStorage também bypassa
+        if (sess?.superAdmin === true) return 'enterprise';
         if (sess?.plano) return sess.plano;
       }
     } catch (_) {}
@@ -167,6 +172,9 @@
 
   // ── Verifica uma flag ─────────────────────────────────────────────
   function pode(flag) {
+    // SuperAdmin bypassa todas as restrições de plano
+    if (window.CH?.SaasService?.isSuperAdmin?.()) return true;
+
     // Override manual tem prioridade
     if (flag in _overrides) return !!_overrides[flag];
 
@@ -189,6 +197,8 @@
 
   /** Retorna o valor numérico de um limite (ex: max_produtos) */
   function limite(flag) {
+    // SuperAdmin: sem limites
+    if (window.CH?.SaasService?.isSuperAdmin?.()) return Infinity;
     const plano = planoAtual();
     if (plano === '_standalone') return Infinity;
     const flags = PLANO_FLAGS[plano] || PLANO_FLAGS.free;

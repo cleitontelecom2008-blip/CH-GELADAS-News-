@@ -174,12 +174,53 @@
   // Login super-admin (dono do SaaS)
   // Hash fixo cacheado — calculado 1 vez, não a cada login
   let _superHash = null;
-  async function loginSuperAdmin(senha) {
+  async function loginSuperAdmin(senha, empresaId = null) {
     if (!_superHash) _superHash = await CryptoService.sha256('chgeladas_saas_master_2025');
     const hash = await CryptoService.sha256(senha.trim());
     if (hash !== _superHash) throw new Error('Senha incorreta');
+
     const sess = { superAdmin: true, nome: 'Super Admin', loginAt: Date.now() };
+
+    // Modo pessoal: carrega contexto de uma empresa específica
+    // (mantém superAdmin: true — sem restrições de plano)
+    if (empresaId) {
+      await _ensureDB();
+      const empSnap = await _fb.getDoc(_fb.doc(_db, 'saas_empresas', empresaId));
+      if (empSnap.exists()) {
+        const emp = empSnap.data();
+        sess.empresaId = empresaId;
+        sess.plano     = 'enterprise'; // dono da plataforma = enterprise sempre
+        sess.nome      = `Admin (${emp.nome})`;
+        sess.nomeEmpresa = emp.nome;
+      }
+    }
+
     _saveSession(sess);
+    return sess;
+  }
+
+  /**
+   * SuperAdmin entra no contexto de uma empresa específica.
+   * Exige que já esteja logado como superAdmin.
+   * Mantém superAdmin: true → sem restrições de plano.
+   */
+  async function enterEmpresa(empresaId) {
+    if (!isSuperAdmin()) throw new Error('Apenas o SuperAdmin pode usar esta função');
+    await _ensureDB();
+
+    const empSnap = await _fb.getDoc(_fb.doc(_db, 'saas_empresas', empresaId));
+    if (!empSnap.exists()) throw new Error('Empresa não encontrada');
+    const emp = empSnap.data();
+
+    const sess = {
+      ...getSession(),          // mantém superAdmin: true e loginAt
+      empresaId,
+      plano:       'enterprise',
+      nome:        `Admin (${emp.nome})`,
+      nomeEmpresa: emp.nome,
+    };
+    _saveSession(sess);
+    EventBus.emit('saas:login', sess);
     return sess;
   }
 
@@ -289,7 +330,26 @@
     await _fb.updateDoc(_fb.doc(_db, 'saas_usuarios', uid), { ativo: false });
   }
 
-  // ─── SUPER ADMIN — lista todas as empresas ────────────────────────
+  // ─── BUSCA PÚBLICA DE EMPRESA (para tela de login do cliente) ────
+  // Não requer autenticação — busca por nome normalizado
+  async function buscarEmpresaPorNome(termo) {
+    await _ensureDB();
+    const termoNorm = termo.trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Busca por prefixo no nome normalizado (campo nomeNorm, se existir)
+    // Fallback: lista todas e filtra em memória (ok para poucos registros)
+    const snap = await _fb.getDocs(_fb.collection(_db, 'saas_empresas'));
+    const todas = snap.docs.map(d => d.data()).filter(e => e.ativo);
+
+    const resultado = todas.find(e => {
+      const nomeNorm = (e.nome || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return nomeNorm.includes(termoNorm);
+    });
+
+    return resultado || null;
+  }
 
   // Gera convite como super admin (sem verificar isOwner)
   async function gerarConviteAdmin(empresaId, role = 'colaborador') {
@@ -334,12 +394,14 @@
     isOwner, isSuperAdmin, logout,
     // Registro / Login
     registrarEmpresa, login, loginSuperAdmin,
+    // Busca pública (login do cliente)
+    buscarEmpresaPorNome,
     // Convites
     gerarConvite, usarConvite,
     // Usuários
     getUsuariosEmpresa, desativarUsuario,
     // Super admin
-    listarEmpresas, atualizarPlano, toggleEmpresa, gerarConviteAdmin,
+    listarEmpresas, atualizarPlano, toggleEmpresa, gerarConviteAdmin, enterEmpresa,
     // Planos
     getPlanos, getPlano,
   };
