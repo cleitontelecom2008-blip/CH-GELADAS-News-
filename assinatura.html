@@ -260,14 +260,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script>
 'use strict';
 
-const { Store, Utils, EventBus } = window.CH;
-let _ciclo   = 'mensal';
-let _pedido  = null;
+// Evita conflito com _Store já declarado em outros scripts
+const _AS = window.CH;
+const _Store    = _AS?.Store;
+const _Utils    = _AS?.Utils;
+const _EventBus = _AS?.EventBus;
+
+let _ciclo      = 'mensal';
+let _pedido     = null;
 let _planoAtual = 'free';
 
 // ── Formatação ─────────────────────────────────────────────────────
 const fmt  = v => 'R$ ' + (v/100).toLocaleString('pt-BR', {minimumFractionDigits:2});
 const fmtV = v => 'R$ ' + (v/100).toFixed(2).replace('.',',');
+
+// ── Toggle ciclo (precisa estar definida antes dos botões HTML) ────
+function setCiclo(c) {
+  _ciclo = c;
+  document.getElementById('btn-mensal').classList.toggle('active', c === 'mensal');
+  document.getElementById('btn-anual').classList.toggle('active',  c === 'anual');
+  renderPlanos();
+}
 
 // ── Toast ─────────────────────────────────────────────────────────
 function toast(msg, tipo = 'ok') {
@@ -278,13 +291,6 @@ function toast(msg, tipo = 'ok') {
   el._t = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
-// ── Toggle ciclo ──────────────────────────────────────────────────
-function setCiclo(c) {
-  _ciclo = c;
-  document.getElementById('btn-mensal').classList.toggle('active', c === 'mensal');
-  document.getElementById('btn-anual').classList.toggle('active',  c === 'anual');
-  renderPlanos();
-}
 
 // ── Render planos ─────────────────────────────────────────────────
 function renderPlanos() {
@@ -347,7 +353,7 @@ function renderPlanos() {
 // ── Assinatura ────────────────────────────────────────────────────
 async function iniciarAssinatura(planoId) {
   const BS = window.CH.BillingService;
-  const chavePix = Store.getConfig()?.billing?.chavePix;
+  const chavePix = _Store.getConfig()?.billing?.chavePix;
 
   if (!chavePix) {
     toast('Configure a chave PIX antes de gerar cobranças', 'err');
@@ -411,7 +417,7 @@ function fecharModal() {
 }
 
 function reabrirPix() {
-  const p = Store.getConfig()?.billing?.pedidoPendente;
+  const p = _Store.getConfig()?.billing?.pedidoPendente;
   if (p) abrirModalPix(p);
 }
 
@@ -444,7 +450,7 @@ async function confirmarPgtoAdmin() {
 
 // ── Pendente ──────────────────────────────────────────────────────
 function renderPendente() {
-  const p   = Store.getConfig()?.billing?.pedidoPendente;
+  const p   = _Store.getConfig()?.billing?.pedidoPendente;
   const box = document.getElementById('pendente-box');
   if (!p) { box.style.display = 'none'; return; }
   box.style.display = 'block';
@@ -456,8 +462,8 @@ function renderPendente() {
 
 // ── Histórico ─────────────────────────────────────────────────────
 function renderHistorico() {
-  const hist = Store.getConfig()?.billing?.historico || [];
-  const ult  = Store.getConfig()?.billing?.ultimoPagamento;
+  const hist = _Store.getConfig()?.billing?.historico || [];
+  const ult  = _Store.getConfig()?.billing?.ultimoPagamento;
   const todos = ult ? [ult, ...hist] : hist;
   const wrap  = document.getElementById('historico-wrap');
   if (!todos.length) {
@@ -504,7 +510,7 @@ function salvarConfigPix() {
 }
 
 function carregarConfigPix() {
-  const cfg = Store.getConfig()?.billing || {};
+  const cfg = _Store.getConfig()?.billing || {};
   const el  = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
   el('cfg-chave-pix',      cfg.chavePix);
   el('cfg-nome-recebedor', cfg.nomeRecebedor);
@@ -542,7 +548,7 @@ function boot() {
   carregarConfigPix();
 
   // Escuta confirmação de pagamento
-  EventBus.on('billing:confirmado', () => {
+  _EventBus.on('billing:confirmado', () => {
     carregarAssinaturaAtual();
     renderPlanos();
     renderPendente();
