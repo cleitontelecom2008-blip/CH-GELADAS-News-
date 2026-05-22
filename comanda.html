@@ -77,7 +77,7 @@ body.is-admin .adm-only{display:flex!important;}
 <div id="lock">
   <div style="background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.08);border-radius:2.5rem;padding:2.5rem;width:100%;max-width:360px;margin:0 1rem;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8);">
     <div class="text-5xl mb-4">🍽️</div>
-    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight"><span data-wl="nomeEmpresa">CH GELADAS</span></h1>
+    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight">CH <span class="text-purple-400">GELADAS</span></h1>
     <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-8">Módulo de Comandas</p>
     <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
     <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
@@ -100,7 +100,7 @@ body.is-admin .adm-only{display:flex!important;}
       </button>
       <span class="text-2xl">🍽️</span>
       <div>
-        <h1 id="headerTitulo" class="text-[10px] font-black uppercase tracking-widest text-purple-400"><span data-wl="nomeApp">Comandas</span></h1>
+        <h1 id="headerTitulo" class="text-[10px] font-black uppercase tracking-widest text-purple-400">Comandas</h1>
         <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
       </div>
     </div>
@@ -279,11 +279,6 @@ body.is-admin .adm-only{display:flex!important;}
   <script src="./services/estoqueService.js"></script>
   <script src="./services/financeiroService.js"></script>
   <script src="./services/vendasService.js"></script>
-  <script src="./services/errorPreventionService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
 
 <script>
 'use strict';
@@ -332,7 +327,20 @@ document.getElementById('loginSenha').addEventListener('keydown', function(e) { 
 document.getElementById('loginNome').addEventListener('keydown',  function(e) { if (e.key === 'Enter') document.getElementById('loginSenha').focus(); });
 function logout() { if (!confirm('Encerrar sessão?')) return; AuthService.logout(); location.reload(); }
 
-/* ══ RESET COMANDAS ══ */
+/* ══ REMOVER COMANDA PAGA ══ */
+function removerComanda(id) {
+  const cmd = Store.getComandas().find(c => c.id === id);
+  if (!cmd) return;
+  if (cmd.status !== 'paga') { UIService.showToast('Apenas comandas pagas podem ser removidas', '', 'error'); return; }
+  if (!confirm(`Remover a comanda "${cmd.nome}" da lista?\nOs dados da venda já foram registrados.`)) return;
+  Store.mutateComandas(cmds => {
+    const idx = cmds.findIndex(c => c.id === id);
+    if (idx >= 0) cmds.splice(idx, 1);
+  });
+  UIService.showToast('Mesa removida', cmd.nome, 'success');
+  renderGrade();
+  atualizarKpis();
+}
 function resetComandas() {
   if (!AuthService.isAdmin()) { UIService.showToast('Apenas ADM','','error'); return; }
   const abertas = Store.getComandas().filter(c => c.status !== 'fechada');
@@ -356,11 +364,21 @@ let _cmdAtualId = null;  // id da comanda aberta no detalhe
    INIT
 ════════════════════════════════ */
 function init() {
-  window.CH?.WhitelabelService?.aplicar?.({});
   UIService.startClock('clock');
   if (AuthService.isAdmin()) document.body.classList.add('is-admin');
-  renderGrade();
-  atualizarKpis();
+  // Força pull do Firestore para carregar comandas atualizadas em qualquer aparelho
+  if (window.CH?.SyncService) {
+    window.CH.SyncService.pull(['comandas']).then(() => {
+      renderGrade();
+      atualizarKpis();
+    }).catch(() => {
+      renderGrade();
+      atualizarKpis();
+    });
+  } else {
+    renderGrade();
+    atualizarKpis();
+  }
   EventBus.on('store:updated', () => {
     atualizarKpis();
     if (_cmdAtualId) renderDetalhe(); else renderGrade();
@@ -444,7 +462,12 @@ function renderGrade() {
           <p class="text-[8px] text-slate-500 font-bold">${qtdItens} item${qtdItens!==1?'s':''}</p>
         </div>
         ${!paga ? `<button onclick="event.stopPropagation();abrirComanda('${c.id}')" class="bg-purple-700/30 border border-purple-500/30 text-purple-300 px-3 py-1.5 rounded-xl font-black text-[9px] uppercase hover:bg-purple-700/50 transition-all">Abrir →</button>` : ''}
-        ${paga ? `<p class="text-[8px] text-emerald-400 font-bold">${c.formaPgto||''}</p>` : ''}
+        ${paga ? `<div class="flex items-center gap-2">
+          <p class="text-[8px] text-emerald-400 font-bold">${c.formaPgto||''}</p>
+          <button onclick="event.stopPropagation();removerComanda('${c.id}')" class="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 flex items-center justify-center transition-all" title="Remover mesa">
+            <i class="fas fa-times text-[9px]"></i>
+          </button>
+        </div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -501,6 +524,7 @@ function addItemComanda(prodId) {
     const idx = cmd.itens.findIndex(i => i.prodId === prodId);
     if (idx >= 0) { cmd.itens[idx].qtd++; }
     else { cmd.itens.push({ prodId, nome: prod.nome, preco: prod.precoUn||0, custo: prod.custoUn||0, qtd: 1 }); }
+    cmd.updatedAt = new Date().toISOString();
   });
 
   renderDetalhe();
@@ -571,6 +595,7 @@ function alterarQtdComanda(idx, delta) {
     const novaQtd = (cmd.itens[idx]?.qtd||0) + delta;
     if (novaQtd <= 0) cmd.itens.splice(idx, 1);
     else cmd.itens[idx].qtd = novaQtd;
+    cmd.updatedAt = new Date().toISOString();
   });
   renderDetalhe();
 }
@@ -578,7 +603,7 @@ function alterarQtdComanda(idx, delta) {
 function removerItemComanda(idx) {
   Store.mutateComandas(cmds => {
     const cmd = cmds.find(c => c.id === _cmdAtualId);
-    if (cmd) cmd.itens.splice(idx, 1);
+    if (cmd) { cmd.itens.splice(idx, 1); cmd.updatedAt = new Date().toISOString(); }
   });
   renderDetalhe();
 }
@@ -654,21 +679,6 @@ async function confirmarFechamento(forma) {
     label: 'UNID',   qtd:  i.qtd,
   }));
 
-  // ── Validação preventiva (ErrorPreventionService) ─────────────
-  const EP = window.CH?.ErrorPreventionService;
-  if (EP) {
-    const cartFake = { getItems: () => itens, getTotal: () => total, getSubtotal: () => total, getDesconto: () => 0 };
-    const { ok, erros, avisos } = EP.validarCarrinho(cartFake);
-    if (!ok) {
-      alert('Não é possível fechar a comanda:\n\n' + erros.map(e => '• ' + e.msg).join('\n'));
-      window.CH?.SoundService?.error();
-      return;
-    }
-    if (avisos.length) {
-      if (!confirm('⚠️ Atenção:\n\n' + avisos.map(a => '• ' + a.msg).join('\n') + '\n\nContinuar?')) return;
-    }
-  }
-
   // Monta objeto que imita CartService para VendasService.finalizarVenda
   const cartProxy = {
     getItems:     () => itens,
@@ -717,6 +727,7 @@ async function confirmarFechamento(forma) {
       cmds[idx].status    = 'paga';
       cmds[idx].formaPgto = forma;
       cmds[idx].fechadoEm = new Date().toISOString();
+      cmds[idx].updatedAt = new Date().toISOString();
       cmds[idx].total     = total;
       cmds[idx].vendaId   = venda?.id || null;
     }

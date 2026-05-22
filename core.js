@@ -27,6 +27,9 @@ const CONSTANTS = Object.freeze({
   CATEGORIAS:     'CH_CATEGORIAS',
   FORNECEDORES:   'CH_FORNECEDORES',
   FINANCEIRO:     'CH_FINANCEIRO',
+  SAIDAS:         'CH_SAIDAS',
+  CAMBIO:         'CH_CAMBIO',
+  PERFIS:         'CH_PERFIS',
   SYNC_QUEUE:     'CH_SYNC_QUEUE',
   }),
 
@@ -45,6 +48,7 @@ const CONSTANTS = Object.freeze({
   MAX_COMANDAS:      2_000,
   MAX_MOVIMENTACOES: 10_000,
   MAX_FINANCEIRO:    5_000,
+  MAX_SAIDAS:        5_000,
   MAX_SYNC_QUEUE:    500,
 
   PIN_HASH: Object.freeze({
@@ -54,43 +58,43 @@ const CONSTANTS = Object.freeze({
 
   PERMISSOES: Object.freeze({
   pdv: Object.freeze({
-    ler:      ['estoque', 'config'],
+    ler:      ['estoque', 'config', 'perfis'],
     escrever: ['vendas'],
   }),
   admin: Object.freeze({
-    ler:      ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro'],
-    escrever: ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro'],
+    ler:      ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro','saidas','cambio','perfis'],
+    escrever: ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro','saidas','cambio','perfis'],
   }),
   adm: Object.freeze({
-    ler:      ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro'],
-    escrever: ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro'],
+    ler:      ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro','saidas','cambio','perfis'],
+    escrever: ['estoque','vendas','comandas','fiado','ponto','pedidos','config','auditoria','movimentacoes','categorias','fornecedores','financeiro','saidas','cambio','perfis'],
   }),
   colaborador: Object.freeze({
-    ler:      ['vendas'],
-    escrever: ['vendas'],
+    ler:      ['vendas', 'comandas', 'fiado', 'perfis'],
+    escrever: ['vendas', 'comandas'],
   }),
   controlador: Object.freeze({
-    ler:      ['vendas','aprovacao'],
+    ler:      ['vendas','aprovacao', 'perfis'],
     escrever: ['aprovacao'],
   }),
   validador: Object.freeze({
-    ler:      ['vendas','estoque','financeiro','aprovacao'],
+    ler:      ['vendas','estoque','financeiro','aprovacao', 'perfis'],
     escrever: ['aprovacao'],
   }),
   analista: Object.freeze({
-    ler:      ['vendas','estoque','financeiro','aprovacao'],
+    ler:      ['vendas','estoque','financeiro','aprovacao', 'perfis'],
     escrever: ['aprovacao'],
   }),
   gerente: Object.freeze({
-    ler:      ['estoque','vendas','comandas','fiado','ponto','financeiro'],
-    escrever: ['estoque','vendas','comandas','fiado','ponto','financeiro'],
+    ler:      ['estoque','vendas','comandas','fiado','ponto','financeiro','cambio','perfis'],
+    escrever: ['estoque','vendas','comandas','fiado','ponto','financeiro','cambio','perfis'],
   }),
   operador: Object.freeze({
-    ler:      ['estoque','vendas','comandas'],
+    ler:      ['estoque','vendas','comandas','fiado','perfis'],
     escrever: ['vendas','comandas'],
   }),
   entregador: Object.freeze({
-    ler:      ['pedidos'],
+    ler:      ['pedidos', 'perfis'],
     escrever: ['pedidos'],
   }),
   }),
@@ -105,7 +109,7 @@ const Utils = Object.freeze({
     style: 'currency', currency: 'BRL', ...CONSTANTS.CURRENCY,
   }).format(Number(v) || 0);
   },
-  todayISO()   { return new Date().toISOString().slice(0, 10); },
+  todayISO()   { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; },
   today()      { return new Date().toLocaleDateString('pt-BR'); },
   nowTime()    { return new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); },
   nowFull()    { return new Date().toLocaleString('pt-BR'); },
@@ -190,12 +194,13 @@ const Store = (() => {
   categorias:    CONSTANTS.DB.CATEGORIAS,
   fornecedores:  CONSTANTS.DB.FORNECEDORES,
   financeiro:    CONSTANTS.DB.FINANCEIRO,
+  saidas:        CONSTANTS.DB.SAIDAS,
   };
 
   const _empty = {
   estoque:[], vendas:[], comandas:[], fiado:[],
   ponto:[], pedidos:[], auditoria:[], config:{},
-  movimentacoes:[], categorias:[], fornecedores:[], financeiro:[],
+  movimentacoes:[], categorias:[], fornecedores:[], financeiro:[], saidas:[],
   };
 
   const _limits = {
@@ -203,6 +208,7 @@ const Store = (() => {
   pedidos: CONSTANTS.MAX_PEDIDOS, auditoria: CONSTANTS.MAX_AUDITORIA,
   comandas: CONSTANTS.MAX_COMANDAS, movimentacoes: CONSTANTS.MAX_MOVIMENTACOES,
   financeiro: CONSTANTS.MAX_FINANCEIRO,
+  saidas:     CONSTANTS.MAX_SAIDAS,
   };
 
   function _read(col) {
@@ -251,7 +257,6 @@ const Store = (() => {
      purgeCol('movimentacoes', dtM, _key.movimentacoes);
 
      localStorage.setItem(_key[col], JSON.stringify(data));
-     console.info('[Store] Purge de emergência concluído — dado salvo.');
    } catch(e2) {
      console.error('[Store] localStorage crítico — dado só em memória:', col, e2);
      EventBus.emit('storage:critical', col);
@@ -304,7 +309,6 @@ const Store = (() => {
     if (Array.isArray(old.ponto)    && old.ponto.length)    _write('ponto',    old.ponto);
     if (Array.isArray(old.pedidos)  && old.pedidos.length)  _write('pedidos',  old.pedidos);
     if (old.config && typeof old.config === 'object')        _write('config',   old.config);
-    console.info('[Store] Banco legado migrado.');
   } catch(e) { console.warn('[Store] Migração falhou:', e); }
   }
 
@@ -328,6 +332,7 @@ const Store = (() => {
   getCategorias()    { return _read('categorias'); },
   getFornecedores()  { return _read('fornecedores'); },
   getFinanceiro()    { return _read('financeiro'); },
+  getSaidas()        { return _read('saidas'); },
 
   getVendasHoje() {
     const hoje = Utils.todayISO();
@@ -344,12 +349,13 @@ const Store = (() => {
     _mutate('estoque', (data) => {
    fn(data);
    data.forEach(p => {
-     if (p.precoVenda   !== undefined) p.precoUn      = p.precoVenda;
-     else if (p.precoUn !== undefined) p.precoVenda   = p.precoUn;
-     if (p.precoCusto   !== undefined) p.custoUn      = p.precoCusto;
-     else if (p.custoUn !== undefined) p.precoCusto   = p.custoUn;
-     if (p.estoqueAtual !== undefined) p.qtdUn        = p.estoqueAtual;
-     else if (p.qtdUn   !== undefined) p.estoqueAtual = p.qtdUn;
+     // precoUn é fonte da verdade — propaga para alias, nunca o contrário
+     if (p.precoUn      !== undefined) p.precoVenda   = p.precoUn;
+     else if (p.precoVenda !== undefined) p.precoUn   = p.precoVenda;
+     if (p.custoUn      !== undefined) p.precoCusto   = p.custoUn;
+     else if (p.precoCusto !== undefined) p.custoUn   = p.precoCusto;
+     if (p.qtdUn        !== undefined) p.estoqueAtual = p.qtdUn;
+     else if (p.estoqueAtual !== undefined) p.qtdUn   = p.estoqueAtual;
    });
     });
   },
@@ -364,6 +370,7 @@ const Store = (() => {
   mutateCategorias(fn)    { _mutate('categorias',    fn); },
   mutateFornecedores(fn)  { _mutate('fornecedores',  fn); },
   mutateFinanceiro(fn)    { _mutate('financeiro',    fn); },
+  mutateSaidas(fn)        { _mutate('saidas',        fn); },
 
   invalidate(col) {
     if (col) delete _cache[col];
@@ -377,7 +384,7 @@ const Store = (() => {
    * Vendas/financeiro/auditoria/movimentações: mantém só os últimos N dias.
    * Estoque/config/fiado/comandas: não purga (dados operacionais ativos).
    */
-  purgeOldData({ diasVendas = 30, diasFinanceiro = 30, diasAuditoria = 7, diasMovimentacoes = 14 } = {}) {
+  purgeOldData({ diasVendas = 30, diasFinanceiro = 30, diasAuditoria = 7, diasMovimentacoes = 14, diasSaidas = 90 } = {}) {
     const corte = (dias) => {
    const d = new Date();
    d.setDate(d.getDate() - dias);
@@ -420,11 +427,19 @@ const Store = (() => {
    purged.movimentacoes = movAntes - movFiltradas.length;
     }
 
-    ['vendas','financeiro','auditoria','movimentacoes'].forEach(c => delete _cache[c]);
+    // Saídas — mantém 90 dias por padrão (histórico longo)
+    const saiAntes = _read('saidas').length;
+    const cortaSai = corte(diasSaidas);
+    const saiFiltradas = _read('saidas').filter(s => (s.dataCurta || s.data || '') >= cortaSai);
+    if (saiFiltradas.length < saiAntes) {
+   _write('saidas', saiFiltradas);
+   purged.saidas = saiAntes - saiFiltradas.length;
+    }
+
+    ['vendas','financeiro','auditoria','movimentacoes','saidas'].forEach(c => delete _cache[c]);
 
     const total = Object.values(purged).reduce((s, n) => s + n, 0);
     if (total > 0) {
-   console.info('[Store] Purge localStorage:', purged, `— ${total} registros removidos (estão no Firestore)`);
    EventBus.emit('store:purged', purged);
     }
     return purged;
@@ -486,7 +501,6 @@ const Store = (() => {
      }
      delete _cache[col];
      _notify(col);
-     console.info(`[Store] Hidratado do Firestore: ${col} (${Array.isArray(remoto) ? remoto.length : 1} registros)`);
    } catch(e) {
      console.warn(`[Store] Hidratação falhou para ${col}:`, e.message);
    }
@@ -538,12 +552,12 @@ const Store = (() => {
 
 const FirebaseService = (() => {
   const CONFIG = {
-  apiKey:            'AIzaSyCPq8-B4l-kThTXtX9CVBTdpzarBObUYxI',
-  authDomain:        'ch-geladas.firebaseapp.com',
-  projectId:         'ch-geladas',
-  storageBucket:     'ch-geladas.firebasestorage.app',
-  messagingSenderId: '859746983655',
-  appId:             '1:859746983655:web:d126d82167b0ccab3a8c42',
+  apiKey:            'AIzaSyDdFvTRQQmomMiLD0byrBwGZnitSC0zwus',
+  authDomain:        'new-ch-geladas.firebaseapp.com',
+  projectId:         'new-ch-geladas',
+  storageBucket:     'new-ch-geladas.firebasestorage.app',
+  messagingSenderId: '898297448757',
+  appId:             '1:898297448757:web:d59cb5336d61d19ad9a47c',
   measurementId:     'G-QYJRW9YEPW',
   };
 
@@ -553,7 +567,7 @@ const FirebaseService = (() => {
 
   async function init() {
   if (_ready) return true;
-  if (!CONFIG.apiKey) { console.info('[Firebase] Sem config — offline.'); return false; }
+  if (!CONFIG.apiKey) { return false; }
   try {
     const { initializeApp, getApps, getApp } =
    await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
@@ -566,17 +580,15 @@ const FirebaseService = (() => {
 
     if (!_auth.currentUser) {
    await auth.signInAnonymously(_auth);
-   console.info('[Firebase] ✓ Auth anônima. UID:', _auth.currentUser?.uid);
     }
 
     _ready = true;
 
     if (!_adminToken) {
    const saved = sessionStorage.getItem('CH_ADMIN_TOKEN');
-   if (saved) { _adminToken = saved; console.info('[Firebase] ✓ adminToken restaurado da sessão.'); }
+   if (saved) { _adminToken = saved; }
     }
 
-    console.info('[Firebase] ✓ Projeto:', CONFIG.projectId);
     EventBus.emit('firebase:ready');
     _subscribeRealtime();
     return true;
@@ -593,7 +605,7 @@ const FirebaseService = (() => {
   if (!role || !_db || !_fb) return;
 
   const colsRT = (role === 'admin' || role === 'adm')
-    ? ['estoque', 'config', 'fiado', 'comandas', 'pedidos', 'usuarios']
+    ? ['estoque', 'config', 'fiado', 'comandas', 'pedidos', 'saidas', 'financeiro', 'usuarios']
     : ['estoque', 'config', 'usuarios'];
 
   // ── Listener em tempo real para coleção vendas ────────────────────
@@ -679,11 +691,12 @@ const FirebaseService = (() => {
      localStorage.setItem(key, JSON.stringify(vendasLocal));
      Store.invalidate('vendas');
    } catch(_) {}
-   console.info(`[Firebase] ✓ ${pendentes.length} venda(s) sincronizadas.`);
     } else {
-   const docData = { dados, ts: Utils.nowISO() };
-   if (_adminToken) docData.adminToken = _adminToken;
-   await _fb.setDoc(_fb.doc(_db, 'ch_dados', colName), docData);
+      // Coleções que qualquer autenticado pode escrever (sem adminToken)
+      const _semAdminToken = new Set(['comandas', 'fiado', 'cambio']);
+      const docData = { dados, ts: Utils.nowISO() };
+      if (_adminToken && !_semAdminToken.has(colName)) docData.adminToken = _adminToken;
+      await _fb.setDoc(_fb.doc(_db, 'ch_dados', colName), docData);
     }
     return true;
   } catch(e) {
@@ -706,7 +719,6 @@ const FirebaseService = (() => {
           batch.set(ref, docData, { merge: true });
         });
         await batch.commit();
-        console.info('[Firebase] ✓ venda(s) deletada(s):', ids.length);
       }
       return true;
     } catch(e) {
@@ -723,12 +735,12 @@ const FirebaseService = (() => {
         const batch = _fb.writeBatch(_db);
         itens.forEach(v => {
           const ref = _fb.doc(_db, 'vendas', v.id);
+          // Não inclui adminToken — update de vendas (aprovação) é liberado
+          // para qualquer autenticado no Firestore rules
           const docData = { ...v, _fbSynced: true, updatedAt: Utils.nowISO() };
-          if (_adminToken) docData.adminToken = _adminToken;
           batch.set(ref, docData, { merge: true });
         });
         await batch.commit();
-        console.info('[Firebase] ✓ venda(s) atualizada(s):', itens.length);
       }
       return true;
     } catch(e) {
@@ -860,17 +872,41 @@ const SyncService = (() => {
   for (const col of alvo) {
     const dados = await FirebaseService.ler(col);
     if (dados == null) continue;
-    if (col === 'vendas') {
-   const localVendas = Store.getVendas();
-   const localIds    = new Set(localVendas.map(v => v.id));
-   const novas       = dados.filter(v => v.id && !localIds.has(v.id));
-   if (novas.length > 0) {
-     const merged = [...novas, ...localVendas]
-       .sort((a, b) => (b.criadoEm||'') > (a.criadoEm||'') ? 1 : -1)
-       .slice(0, CONSTANTS.MAX_VENDAS);
-     Store._writeRaw('vendas', merged);
-     console.info(`[Sync] Merge: +${novas.length} vendas do Firebase.`);
-   }
+
+    // ── Coleções com merge inteligente (nunca sobrescreve locais não enviados) ──
+    if (col === 'vendas' || col === 'comandas' || col === 'fiado') {
+      const getLocal = col === 'vendas'    ? () => Store.getVendas()
+                     : col === 'comandas'  ? () => Store.getComandas()
+                     : () => Store.getFiado();
+      const writeRaw = (data) => Store._writeRaw(col, data);
+      const maxLimit = col === 'vendas' ? CONSTANTS.MAX_VENDAS : (CONSTANTS.MAX_COMANDAS || 2000);
+
+      const local    = getLocal();
+      const localIds = new Set(local.map(v => v.id).filter(Boolean));
+
+      // Itens do Firestore que ainda não existem localmente
+      const novosDaNuvem = dados.filter(v => v.id && !localIds.has(v.id));
+
+      // Itens locais que ainda não foram enviados (sem _fbSynced, ou status pendente)
+      // e itens do Firestore atualizados mais recentemente
+      const remoteMap = new Map((dados || []).map(v => [v.id, v]));
+      const localFinal = local.map(v => {
+        const remoto = remoteMap.get(v.id);
+        // Se existe nos dois lados, usa o mais recente
+        if (remoto) {
+          const tsLocal  = v.updatedAt  || v.criadoEm || '';
+          const tsRemoto = remoto.updatedAt || remoto.criadoEm || '';
+          return tsRemoto > tsLocal ? remoto : v;
+        }
+        return v; // só local — mantém
+      });
+
+      if (novosDaNuvem.length > 0 || localFinal.some((v, i) => v !== local[i])) {
+        const merged = [...novosDaNuvem, ...localFinal]
+          .sort((a, b) => (b.criadoEm||'') > (a.criadoEm||'') ? 1 : -1)
+          .slice(0, maxLimit);
+        writeRaw(merged);
+      }
     } else {
    const key = CONSTANTS.DB[col.toUpperCase()];
    if (key) { try { localStorage.setItem(key, JSON.stringify(dados)); } catch(_) {} }
@@ -880,7 +916,6 @@ const SyncService = (() => {
     EventBus.emit(`store:${col}`);
   }
   EventBus.emit('sync:pull:done');
-  console.info('[Sync] Pull concluído para role:', role);
   }
 
   return { push, pull, flush: _flush };
@@ -1068,9 +1103,8 @@ const CartService = (() => {
 
     const idx = _items.findIndex(i => i.prodId === prod.id && i.label === label);
     if (idx >= 0) _items[idx].qtd += qtd;
-    else _items.push({ prodId:prod.id, nome:prod.nome, preco:p, custo, label, qtd, categoria: prod.categoria || '' });
+    else _items.push({ prodId:prod.id, nome:prod.nome, preco:p, custo, label, qtd });
     EventBus.emit('cart:updated');
-    EventBus.emit('cart:item:added', { prodId: prod.id, nome: prod.nome, qtd, label });
   },
 
   remove(idx)         { _items.splice(idx,1); EventBus.emit('cart:updated'); },
@@ -1222,7 +1256,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
   try {
     const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-    console.info('[SW] Registrado:', reg.scope);
     reg.addEventListener('updatefound', () => {
    const novoSW = reg.installing;
    novoSW?.addEventListener('statechange', () => {
@@ -1237,7 +1270,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
 }
 
-console.info(
   '%c CH Geladas core.js v4 %c Services ✓  Transactions ✓  SyncQueue ✓  Audit ✓',
   'background:#1e293b;color:#60a5fa;font-weight:bold;padding:2px 6px;border-radius:4px',
   'color:#94a3b8'

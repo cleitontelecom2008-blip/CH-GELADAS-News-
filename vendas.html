@@ -96,17 +96,13 @@ body.is-admin .adm-flex{display:flex!important;}
 <div id="app" class="hidden flex flex-col min-h-screen">
   <header class="sticky top-0 z-40 px-4 py-3 flex justify-between items-center" style="background:rgba(6,8,16,.96);border-bottom:1px solid rgba(255,255,255,.04);">
     <div class="flex items-center gap-3">
-      <span class="text-2xl" data-wl="logo">🍺</span>
+      <span class="text-2xl">🍺</span>
       <div>
         <div class="flex items-center gap-2">
-          <h1 class="text-[10px] font-black uppercase tracking-widest text-blue-400"><span data-wl="nomeApp">Vendas PDV</span></h1>
+          <h1 class="text-[10px] font-black uppercase tracking-widest text-blue-400">Vendas PDV</h1>
           <span id="roleTag" class="badge b-blue hidden"></span>
         </div>
-        <div class="flex items-center gap-1.5">
-          <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
-          <!-- Filial ativa (oculto se não houver multi-filial) -->
-          <span id="filial-badge" class="hidden text-[8px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md cursor-pointer" onclick="abrirSeletorFilial()" title="Trocar filial"></span>
-        </div>
+        <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -420,11 +416,6 @@ body.is-admin .adm-flex{display:flex!important;}
   <script src="./services/estoqueService.js"></script>
   <script src="./services/financeiroService.js"></script>
   <script src="./services/vendasService.js"></script>
-  <script src="./services/errorPreventionService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
 <script>
 'use strict';
 
@@ -475,41 +466,8 @@ document.getElementById('loginNome').addEventListener('keydown',  function(e) { 
 function logout() { if (!confirm('Encerrar sessão?')) return; AuthService.logout(); location.reload(); }
 
 /* ══ INIT ══ */
-function _initFilialBadge() {
-  const FS = window.CH?.FilialService;
-  const FF = window.CH?.FeatureFlags;
-  if (!FS || !FF?.pode('multi_filial')) return;
-  const badge = document.getElementById('filial-badge');
-  if (!badge) return;
-  const f = FS.getFilialAtualSync();
-  badge.textContent = '📍 ' + f.nome;
-  badge.classList.remove('hidden');
-  window.CH.EventBus.on('filial:trocada', ({ filial }) => {
-    badge.textContent = '📍 ' + filial.nome;
-  });
-}
-
-async function abrirSeletorFilial() {
-  const FS = window.CH?.FilialService;
-  if (!FS) return;
-  const lista = await FS.listar();
-  const opts  = lista.filter(f => f.ativa).map(f => `${f.id}|${f.nome}`).join('\n');
-  const escolha = prompt('Filiais disponíveis:\n\n' + lista.filter(f=>f.ativa).map((f,i)=>`${i+1}. ${f.nome}`).join('\n') + '\n\nDigite o número da filial:');
-  if (!escolha) return;
-  const idx = parseInt(escolha) - 1;
-  const ativas = lista.filter(f => f.ativa);
-  if (ativas[idx]) {
-    await FS.setFilialAtiva(ativas[idx].id);
-    renderCatalogo();
-  }
-}
-
 function init() {
   UIService.startClock('clock');
-  // White-label: aplica tema da empresa
-  window.CH?.WhitelabelService?.aplicar?.({});
-  // Filial badge
-  _initFilialBadge();
   renderCatFiltros();
   renderCatalogo();
   renderCart();
@@ -537,100 +495,39 @@ function renderCatFiltros() {
 function setCategoria(cat) { _catAtiva = cat; renderCatFiltros(); renderCatalogo(); }
 
 /* ══ CATÁLOGO ══ */
-// ── Ultra Fast Catalog Renderer ───────────────────────────────────
-// Estratégia de performance:
-//   1. DOM diff: só atualiza cards cujo estado mudou (qtd/esgotado)
-//   2. requestIdleCallback: render em idle time do browser
-//   3. Debounce na busca (já existia, mantido)
-//   4. Cache de última lista renderizada para comparação O(1)
-const _catalogCache = new Map(); // prodId → último html renderizado
-let   _catalogRafId = null;
-
-function _prodCardHtml(p, thr) {
-  const esg  = (p.qtdUn||0) <= 0;
-  const baixo= !esg && (p.qtdUn||0) <= thr;
-  const badge= esg
-    ? `<span class="badge b-red text-[8px] flex-shrink-0">Esgotado</span>`
-    : baixo
-      ? `<span class="badge b-amber text-[8px] flex-shrink-0">${p.qtdUn} un</span>`
-      : `<span class="text-[9px] text-slate-500 font-bold flex-shrink-0">${p.qtdUn} un</span>`;
-  const packs = (p.packs||[]).map(pk =>
-    `<button class="btn-pk text-[9px] font-black text-amber-300" onclick="addItem('${p.id}','${pk.qtd}x',${pk.preco},event.currentTarget)" ${esg?'disabled':''}><i class="fas fa-boxes text-[9px] mr-1"></i>${pk.qtd}x</button>`
-  ).join('');
-  return `<div class="prod-card ${esg?'esgotado':''}" data-pid="${p.id}">
-    <div class="flex justify-between items-start mb-2">
-      <p class="text-[11px] font-black text-white leading-tight flex-1 mr-2">${p.nome}</p>
-      ${badge}
-    </div>
-    <p class="text-base font-black text-blue-400 mb-3">${Utils.formatCurrency(p.precoUn)}</p>
-    <div class="flex gap-1.5">
-      <button class="btn-un text-[9px] font-black text-blue-300" onclick="addItem('${p.id}','UNID',${p.precoUn},event.currentTarget)" ${esg?'disabled':''}>
-        <i class="fas fa-plus text-[9px] mr-1"></i>1 un
-      </button>
-      ${packs}
-    </div>
-  </div>`;
-}
-
 function renderCatalogo() {
-  // Cancela frame pendente — só executa o mais recente
-  if (_catalogRafId) { cancelAnimationFrame(_catalogRafId); }
-
-  _catalogRafId = requestAnimationFrame(() => {
-    const el = document.getElementById('catalogo');
-    if (!el) return;
-
-    const busca   = (document.getElementById('searchProd')?.value || '').toLowerCase();
-    const thr     = Store.getConfig()?.alertaEstoque || 3;
-    const estoque = Store.getEstoque();
-
-    const prods = estoque.filter(p =>
-      p.ativo !== false &&
-      (!busca || (p.nome||'').toLowerCase().includes(busca)) &&
-      (_catAtiva === 'TODOS' || (p.categoria||'') === _catAtiva)
-    );
-
-    if (prods.length === 0) {
-      _catalogCache.clear();
-      el.innerHTML = `<div class="col-span-2 flex flex-col items-center justify-center py-20 opacity-30">
-        <i class="fas fa-box-open text-5xl mb-4 text-slate-600"></i>
-        <p class="text-[10px] font-black uppercase tracking-widest text-slate-600">${estoque.length===0?'Sem produtos':'Nenhum produto encontrado'}</p>
-      </div>`;
-      return;
-    }
-
-    // ── DOM DIFF: detecta quais cards precisam de update ──────────
-    const novoIds   = new Set(prods.map(p => p.id));
-    const antigoIds = new Set([...el.querySelectorAll('[data-pid]')].map(n => n.dataset.pid));
-
-    let precisaRebuild = false;
-
-    // Verifica se a ordem ou conjunto mudou
-    const atuais = [...el.querySelectorAll('[data-pid]')].map(n => n.dataset.pid);
-    if (atuais.length !== prods.length || prods.some((p,i) => p.id !== atuais[i])) {
-      precisaRebuild = true;
-    }
-
-    if (precisaRebuild) {
-      // Rebuild completo mas limpa o cache dos removidos
-      antigoIds.forEach(id => { if (!novoIds.has(id)) _catalogCache.delete(id); });
-      el.innerHTML = prods.map(p => _prodCardHtml(p, thr)).join('');
-      prods.forEach(p => _catalogCache.set(p.id, `${p.qtdUn}|${p.precoUn}`));
-      return;
-    }
-
-    // ── Atualiza apenas cards que mudaram (diff granular) ─────────
-    prods.forEach(p => {
-      const chave   = `${p.qtdUn}|${p.precoUn}`;
-      if (_catalogCache.get(p.id) === chave) return; // sem mudança
-      _catalogCache.set(p.id, chave);
-      const node = el.querySelector(`[data-pid="${p.id}"]`);
-      if (!node) return;
-      const novo = document.createElement('div');
-      novo.innerHTML = _prodCardHtml(p, thr);
-      el.replaceChild(novo.firstElementChild, node);
-    });
+  const busca = (document.getElementById('searchProd')?.value || '').toLowerCase();
+  const el = document.getElementById('catalogo');
+  if (!el) return;
+  const estoque = Store.getEstoque();
+  let prods = estoque.filter(p => {
+    const mb = !busca || (p.nome||'').toLowerCase().includes(busca);
+    const mc = _catAtiva === 'TODOS' || (p.categoria||'') === _catAtiva;
+    return mb && mc;
   });
+  if (prods.length === 0) {
+    el.innerHTML = `<div class="col-span-2 flex flex-col items-center justify-center py-20 opacity-30">
+      <i class="fas fa-box-open text-5xl mb-4 text-slate-600"></i>
+      <p class="text-[10px] font-black uppercase tracking-widest text-slate-600">${estoque.length===0?'Sem produtos':'Nenhum produto encontrado'}</p>
+    </div>`; return;
+  }
+  el.innerHTML = prods.map(p => {
+    const esg = (p.qtdUn||0) <= 0;
+    const baixo = !esg && p.qtdUn <= (Store.getConfig()?.alertaEstoque||3);
+    return `<div class="prod-card ${esg?'esgotado':''}">
+      <div class="flex justify-between items-start mb-2">
+        <p class="text-[11px] font-black text-white leading-tight flex-1 mr-2">${p.nome}</p>
+        ${esg?'<span class="badge b-red text-[8px] flex-shrink-0">Esgotado</span>':baixo?`<span class="badge b-amber text-[8px] flex-shrink-0">${p.qtdUn} un</span>`:`<span class="text-[9px] text-slate-500 font-bold flex-shrink-0">${p.qtdUn} un</span>`}
+      </div>
+      <p class="text-base font-black text-blue-400 mb-3">${Utils.formatCurrency(p.precoUn)}</p>
+      <div class="flex gap-1.5">
+        <button class="btn-un text-[9px] font-black text-blue-300" onclick="addItem('${p.id}','UNID',${p.precoUn},event.currentTarget)" ${esg?'disabled':''}>
+          <i class="fas fa-plus text-[9px] mr-1"></i>1 un
+        </button>
+        ${(p.packs||[]).map(pk=>`<button class="btn-pk text-[9px] font-black text-amber-300" onclick="addItem('${p.id}','${pk.qtd}x',${pk.preco},event.currentTarget)" ${esg?'disabled':''}><i class="fas fa-boxes text-[9px] mr-1"></i>${pk.qtd}x</button>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ══ CART ══ */
@@ -724,6 +621,43 @@ function fecharDrawer() {
 /* ══ PAGAMENTO ══ */
 function abrirPagamento() {
   if (CartService.isEmpty()) return;
+
+  // ── Bloqueio de pré-requisitos para colaborador/PDV ────────────
+  // Admin e gerente são isentos — operam mesmo sem caixa ou ponto.
+  const { Store, AuthService, Utils } = window.CH;
+  const _role = AuthService.getRole();
+  const _rolesLivres = ['admin', 'adm', 'gerente'];
+
+  if (!_rolesLivres.includes(_role)) {
+    // 1. Verifica se existe qualquer ponto de entrada hoje
+    //    (não filtra por nome — o ponto é registrado manualmente pelo operador)
+    const _hoje      = Utils.todayISO();
+    const _pontoHoje = Store.getPonto().some(p =>
+      p.dataCurta === _hoje &&
+      p.tipo      === 'ENTRADA'
+    );
+    if (!_pontoHoje) {
+      UIService.showToast(
+        'Ponto não registrado',
+        'Bata o ponto de entrada antes de vender',
+        'warning'
+      );
+      return;
+    }
+
+    // 2. Verifica caixa aberto
+    const _caixaRaw = localStorage.getItem('CH_CAIXA_ATUAL');
+    if (!_caixaRaw) {
+      UIService.showToast(
+        'Caixa fechado',
+        'Abra o caixa antes de realizar vendas',
+        'warning'
+      );
+      return;
+    }
+  }
+  // ── Fim do bloqueio ────────────────────────────────────────────
+
   _setText('pgtoResumo', `${CartService.getCount()} itens — ${Utils.formatCurrency(CartService.getTotal())}`);
   const di = document.getElementById('descontoInput');
   if (di) di.value = '';
@@ -928,7 +862,8 @@ function confirmarFiado(clienteId) {
     return;
   }
 
-  // ── Sem aprovação: lança direto ───────────────────────────────────
+  // ── Sem aprovação: lança na conta (tab aberta) ────────────────────
+  // Registra na aba do cliente MAS não finaliza a venda (conta permanece aberta)
   const itensDesc = itens.map(i=>`${i.nome} x${i.qtd}`).join(', ');
   Store.mutateFiado(fiado => {
     const c = fiado.find(x=>x.id===clienteId);
@@ -938,13 +873,24 @@ function confirmarFiado(clienteId) {
     c.movimentacoes.unshift({
       id: Utils.generateId(), tipo: 'fiado',
       descricao: itensDesc || 'Compra PDV',
-      valor: total, itens,
+      valor: total,
+      itens: itens.map(i => ({
+        prodId: i.prodId, nome: i.nome,
+        preco: i.preco, qtd: i.qtd, label: i.label || 'UNID',
+      })),
       criadoEm: new Date().toISOString(),
     });
     if (c.limite>0 && c.saldo >= c.limite) c.bloqueado = true;
   });
+  // Sincroniza fiado com Firestore
+  if (window.CH?.SyncQueue) window.CH.SyncQueue.enqueue('salvar', 'fiado', Store.getFiado());
   EventBus.emit('fiado:lancado', { cliente: cliente.nome, valor: total, obs: 'Venda PDV' });
-  finalizarVenda(`Fiado — ${cliente.nome}`);
+  // Limpa o carrinho para o próximo cliente, mas NÃO cria venda finalizada
+  // A conta fica aberta em Fiado.html até o cliente pagar
+  CartService.clear();
+  renderCatalogo();
+  atualizarAlerta();
+  UIService.showToast(`Fiado lançado — ${cliente.nome}`, Utils.formatCurrency(total), 'warning');
 }
 
 /* ══ FINALIZAR VENDA ══ */
@@ -977,27 +923,6 @@ function _verificarAprovacao() {
 
 function finalizarVenda(forma, troco = 0, parcelaDinheiro = 0, formaRestante = '', parcelaRestante = 0) {
   if (CartService.isEmpty()) return;
-
-  // ── Validação preventiva de erros operacionais ────────────────
-  const EP = window.CH?.ErrorPreventionService;
-  if (EP) {
-    const { ok, erros, avisos } = EP.validarCarrinho(CartService);
-
-    if (!ok) {
-      const msg = erros.map(e => '• ' + e.msg).join('\n');
-      UIService.showToast('Venda bloqueada', erros[0].msg, 'error');
-      window.CH.SoundService?.error();
-      alert('Não é possível finalizar a venda:\n\n' + msg);
-      return;
-    }
-
-    if (avisos.length) {
-      const msgs = avisos.map(a => '• ' + a.msg).join('\n');
-      if (!confirm('⚠️ Atenção antes de finalizar:\n\n' + msgs + '\n\nDeseja continuar mesmo assim?')) {
-        return;
-      }
-    }
-  }
 
   // ── Verifica aprovação independente dos serviços ──────────────
   if (_verificarAprovacao()) {

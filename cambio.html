@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#04060d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CH Geladas">
+<title>Câmbio — CH Geladas</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+:root{--bg:#060810;--border:rgba(255,255,255,0.06);--accent:#f59e0b;}
+*{box-sizing:border-box;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:#f1f5f9;min-height:100vh;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+body{background-image:radial-gradient(ellipse at 20% 80%,rgba(245,158,11,.04) 0%,transparent 50%);}
+
+#lock{position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 40%,#0f1a2e 0%,#060810 70%);display:flex;align-items:center;justify-content:center;}
+#lock.hidden{display:none;}
+
+.modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.82);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility .2s;}
+.modal.open{opacity:1;visibility:visible;pointer-events:auto;}
+.modal.open>.modal-box{animation:mIn .22s cubic-bezier(.34,1.56,.64,1) forwards;}
+@keyframes mIn{from{opacity:0;transform:scale(.93) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-box{background:rgba(13,17,23,.98);border:1px solid rgba(255,255,255,.09);border-radius:2rem;width:100%;box-shadow:0 32px 64px rgba(0,0,0,.6);}
+
+.inp{font-size:16px!important;padding:12px 14px;color:#fff;background:#1e293b;border:2px solid #334155;border-radius:.75rem;width:100%;outline:none;transition:all .2s;font-family:inherit;}
+.inp:focus{border-color:#f59e0b!important;box-shadow:0 0 0 4px rgba(245,158,11,.2)!important;background:#0f172a;}
+.inp::placeholder{color:#64748b;}
+.label{color:#fbbf24;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem;display:block;}
+
+.scroll::-webkit-scrollbar{width:3px;}
+.scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:10px;}
+.no-scroll{-ms-overflow-style:none;scrollbar-width:none;}
+.no-scroll::-webkit-scrollbar{display:none;}
+
+#toast{min-width:220px;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(4rem);opacity:0;pointer-events:none;z-index:200;transition:opacity .25s,transform .25s;background:rgba(13,17,23,.98);border:1px solid rgba(255,255,255,.09);border-radius:1.25rem;padding:1rem 1.25rem;display:flex;align-items:center;gap:.75rem;box-shadow:0 24px 48px rgba(0,0,0,.5);}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.adm-only{display:none!important;}
+body.is-admin .adm-only{display:flex!important;}
+
+.cambio-card{background:rgba(13,17,23,.85);border:1px solid rgba(255,255,255,.07);border-radius:1.25rem;padding:1rem 1.125rem;position:relative;overflow:hidden;transition:all .2s;}
+.cambio-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;}
+.cambio-card.entrada::before{background:#10b981;}
+.cambio-card.saida::before{background:#f59e0b;}
+.cambio-card.cancelado::before{background:#6b7280;}
+
+.badge{display:inline-flex;align-items:center;border-radius:9999px;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:.2rem .55rem;}
+.b-green{background:rgba(16,185,129,.15);color:#34d399;}
+.b-amber{background:rgba(245,158,11,.15);color:#fbbf24;}
+.b-blue{background:rgba(59,130,246,.15);color:#60a5fa;}
+.b-red{background:rgba(239,68,68,.15);color:#f87171;}
+.b-slate{background:rgba(100,116,139,.15);color:#94a3b8;}
+.b-purple{background:rgba(168,85,247,.15);color:#c084fc;}
+
+.forma-btn{padding:.875rem .5rem;border-radius:1rem;font-weight:900;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;display:flex;flex-direction:column;align-items:center;gap:.4rem;transition:all .15s;cursor:pointer;border:2px solid transparent;}
+.forma-btn.sel{transform:scale(1.04);}
+.forma-btn:active{transform:scale(.96);}
+
+.kpi-card{background:rgba(13,17,23,.7);border:1px solid rgba(255,255,255,.06);border-radius:1rem;padding:.875rem 1rem;flex:1;}
+
+/* Separador de data */
+.date-sep{text-align:center;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#475569;padding:.5rem 0;position:relative;}
+.date-sep::before,.date-sep::after{content:'';position:absolute;top:50%;width:35%;height:1px;background:rgba(255,255,255,.05);}
+.date-sep::before{left:0;}.date-sep::after{right:0;}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<div class="sticky top-0 z-40 bg-[#060810]/95 backdrop-blur border-b border-white/5 px-4 py-3 flex items-center justify-between">
+  <a href="index.html" class="w-9 h-9 rounded-xl bg-slate-800/80 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+    <i class="fas fa-arrow-left text-sm"></i>
+  </a>
+  <div class="text-center">
+    <h1 class="text-base font-black">💱 Câmbio</h1>
+    <p id="clock" class="text-[9px] text-slate-500 font-bold"></p>
+  </div>
+  <button onclick="abrirNovoRegistro()" class="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/25 text-amber-300 flex items-center justify-center hover:bg-amber-500/35 transition-all active:scale-95">
+    <i class="fas fa-plus text-sm"></i>
+  </button>
+</div>
+
+<!-- ══ KPIs ══ -->
+<div class="px-4 pt-4 pb-3 flex gap-2">
+  <div class="kpi-card">
+    <p class="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Recebido hoje</p>
+    <p id="kpiRecebido" class="text-lg font-black text-emerald-400">R$ 0,00</p>
+    <p id="kpiRecebidoQtd" class="text-[8px] text-slate-500 font-bold">0 operações</p>
+  </div>
+  <div class="kpi-card">
+    <p class="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Pago espécie</p>
+    <p id="kpiPago" class="text-lg font-black text-amber-400">R$ 0,00</p>
+  </div>
+  <div class="kpi-card">
+    <p class="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Lucro câmbio</p>
+    <p id="kpiLucro" class="text-lg font-black text-blue-400">R$ 0,00</p>
+  </div>
+</div>
+
+<!-- ══ FILTRO DE DATA ══ -->
+<div class="px-4 pb-3 flex gap-2 items-center">
+  <button id="filtHoje" onclick="setFiltro('hoje')" class="filt-btn flex-1 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 font-black text-[9px] uppercase transition-all">Hoje</button>
+  <button id="filtSemana" onclick="setFiltro('semana')" class="filt-btn flex-1 py-1.5 rounded-xl bg-slate-800 border border-white/5 text-slate-500 font-black text-[9px] uppercase transition-all">Semana</button>
+  <button id="filtMes" onclick="setFiltro('mes')" class="filt-btn flex-1 py-1.5 rounded-xl bg-slate-800 border border-white/5 text-slate-500 font-black text-[9px] uppercase transition-all">Mês</button>
+  <input type="date" id="filtData" onchange="setFiltroData(this.value)"
+    class="flex-1 py-1 px-2 rounded-xl bg-slate-800 border border-white/5 text-slate-400 font-bold text-[9px] outline-none">
+</div>
+
+<!-- ══ LISTA ══ -->
+<div id="listaRegistros" class="px-4 pb-8 flex flex-col gap-2 scroll overflow-y-auto" style="max-height:calc(100vh - 260px)">
+  <p class="text-center text-slate-500 text-[10px] font-bold py-8">Nenhum registro ainda</p>
+</div>
+
+<!-- ══ MODAL NOVO REGISTRO ══ -->
+<div id="modalNovo" class="modal">
+  <div class="modal-box max-w-sm p-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h2 class="text-base font-black">Novo Câmbio</h2>
+        <p class="text-slate-500 text-[9px] font-bold">Cliente paga digital · recebe espécie</p>
+      </div>
+      <button onclick="fecharModal()" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center"><i class="fas fa-times text-xs"></i></button>
+    </div>
+
+    <!-- Cliente (opcional) -->
+    <div class="mb-4">
+      <label class="label">Cliente (opcional)</label>
+      <input id="novoCliente" type="text" class="inp" placeholder="Nome do cliente..." autocomplete="off">
+    </div>
+
+    <!-- Valor recebido -->
+    <div class="mb-3">
+      <label class="label">Cliente pagou (Pix / Cartão)</label>
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">R$</span>
+        <input id="novoValorEntrada" type="number" class="inp pl-9 text-xl font-black text-emerald-400"
+          placeholder="0,00" step="0.01" min="0.01" inputmode="decimal" oninput="calcLucro()">
+      </div>
+    </div>
+
+    <!-- Forma de entrada -->
+    <div class="mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <label class="label" style="margin-bottom:0">Forma recebida</label>
+        <span id="taxaLabel" class="text-[9px] font-black text-amber-400 hidden"></span>
+      </div>
+      <div class="grid grid-cols-3 gap-2" id="gridFormaEntrada">
+        <button onclick="selFormaEntrada('Pix')" data-forma="Pix"
+          class="forma-btn bg-blue-600/20 border-blue-500/25 text-blue-300 hover:bg-blue-600/35">
+          <i class="fas fa-qrcode text-lg"></i>Pix
+          <span class="text-[8px] opacity-70 font-black">10%</span>
+        </button>
+        <button onclick="selFormaEntrada('Cartão Débito')" data-forma="Cartão Débito"
+          class="forma-btn bg-purple-600/20 border-purple-500/25 text-purple-300 hover:bg-purple-600/35">
+          <i class="fas fa-credit-card text-lg"></i>Débito
+          <span class="text-[8px] opacity-70 font-black">15%</span>
+        </button>
+        <button onclick="selFormaEntrada('Cartão Crédito')" data-forma="Cartão Crédito"
+          class="forma-btn bg-amber-600/20 border-amber-500/25 text-amber-300 hover:bg-amber-600/35">
+          <i class="fas fa-credit-card text-lg"></i>Crédito
+          <span class="text-[8px] opacity-70 font-black">20%</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Valor entregue em espécie -->
+    <div class="mb-3">
+      <div class="flex items-center justify-between mb-1">
+        <label class="label" style="margin-bottom:0">Entregou em espécie</label>
+        <span class="text-[8px] text-slate-600 font-bold">calculado automaticamente · editável</span>
+      </div>
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">R$</span>
+        <input id="novoValorSaida" type="number" class="inp pl-9 text-xl font-black text-amber-400"
+          placeholder="0,00" step="0.01" min="0" inputmode="decimal" oninput="calcLucro()">
+      </div>
+    </div>
+
+    <!-- Preview lucro -->
+    <div id="previewLucro" class="hidden bg-slate-900/60 border border-white/5 rounded-xl p-3 mb-4 space-y-1.5">
+      <div class="flex justify-between items-center">
+        <span class="text-[9px] text-slate-500 font-black uppercase tracking-widest">Taxa aplicada</span>
+        <span id="previewTaxa" class="text-[10px] font-black text-amber-400"></span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-[9px] text-slate-500 font-black uppercase tracking-widest">Lucro da operação</span>
+        <span id="previewLucroVal" class="text-base font-black text-blue-400">R$ 0,00</span>
+      </div>
+    </div>
+
+    <!-- Observação -->
+    <div class="mb-5">
+      <label class="label">Observação (opcional)</label>
+      <input id="novoObs" type="text" class="inp" placeholder="Ex: Regularão da padaria..." autocomplete="off">
+    </div>
+
+    <button onclick="salvarRegistro()"
+      class="w-full py-3.5 rounded-2xl bg-amber-500 text-slate-900 font-black text-sm uppercase tracking-wide hover:bg-amber-400 active:scale-95 transition-all">
+      <i class="fas fa-check mr-2"></i>Confirmar Câmbio
+    </button>
+  </div>
+</div>
+
+<!-- ══ MODAL DETALHE ══ -->
+<div id="modalDetalhe" class="modal">
+  <div class="modal-box max-w-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-black">Detalhe do Câmbio</h2>
+      <button onclick="fecharDetalhe()" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center"><i class="fas fa-times text-xs"></i></button>
+    </div>
+    <div id="detalheConteudo" class="space-y-3"></div>
+    <div class="flex gap-2 mt-5 adm-only">
+      <button id="btnCancelarReg" onclick="cancelarRegistro()"
+        class="flex-1 py-2.5 rounded-xl bg-red-900/30 border border-red-500/20 text-red-400 font-black text-[10px] uppercase hover:bg-red-900/50 transition-all active:scale-95">
+        <i class="fas fa-ban mr-1"></i>Cancelar
+      </button>
+      <button onclick="excluirRegistro()"
+        class="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-400 font-black text-[10px] uppercase hover:bg-slate-700 transition-all active:scale-95">
+        <i class="fas fa-trash mr-1"></i>Excluir
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST ══ -->
+<div id="toast">
+  <span id="toastIcon" class="text-lg"></span>
+  <div><p id="toastTitulo" class="font-black text-sm"></p><p id="toastSub" class="text-slate-400 text-[10px] font-bold"></p></div>
+</div>
+
+<!-- ══ SCRIPTS ══ -->
+<script src="./core.js"></script>
+<script src="./services/estoqueService.js"></script>
+<script src="./services/vendasService.js"></script>
+<script src="./services/syncService.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════
+   CÂMBIO — Pix/Cartão → Espécie
+   Registra operações em que o cliente paga via digital
+   e recebe espécie (dinheiro). A diferença é lucro.
+════════════════════════════════════════════════════════ */
+
+const CH_CAMBIO_KEY = 'CH_CAMBIO';
+
+/* ── Storage ─────────────────────────────── */
+function getCambios() {
+  try { return JSON.parse(localStorage.getItem(CH_CAMBIO_KEY) || '[]'); } catch { return []; }
+}
+function saveCambios(list) {
+  try { localStorage.setItem(CH_CAMBIO_KEY, JSON.stringify(list)); } catch {}
+}
+function mutateCambio(fn) {
+  const list = getCambios();
+  fn(list);
+  saveCambios(list);
+}
+
+/* ── Helpers ─────────────────────────────── */
+// Helpers lazy — só acessam window.CH após DOMContentLoaded
+function _utils()  { return window.CH.Utils; }
+function _ui()     { return window.CH.UIService; }
+function _auth()   { return window.CH.AuthService; }
+
+function fmt(v) { return _utils().formatCurrency(v); }
+
+function hoje() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - offset * 60000);
+  return local.toISOString().split('T')[0];
+}
+
+function nowISO() { return new Date().toISOString(); }
+function nowTime() {
+  const n = new Date();
+  return n.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function tempoRelativo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'agora';
+  if (m < 60) return `${m}min atrás`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h atrás`;
+  return new Date(iso).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' });
+}
+
+function showToast(titulo, sub, tipo) {
+  const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' };
+  document.getElementById('toastTitulo').textContent = titulo;
+  document.getElementById('toastSub').textContent = sub || '';
+  document.getElementById('toastIcon').textContent = icons[tipo] || '💡';
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ── Filtro ──────────────────────────────── */
+let _filtro = 'hoje';
+let _filtroData = '';
+
+function setFiltro(f) {
+  _filtro = f;
+  _filtroData = '';
+  document.getElementById('filtData').value = '';
+  document.querySelectorAll('.filt-btn').forEach(b => {
+    b.className = 'filt-btn flex-1 py-1.5 rounded-xl bg-slate-800 border border-white/5 text-slate-500 font-black text-[9px] uppercase transition-all';
+  });
+  const map = { hoje:'filtHoje', semana:'filtSemana', mes:'filtMes' };
+  const btn = document.getElementById(map[f]);
+  if (btn) btn.className = 'filt-btn flex-1 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 font-black text-[9px] uppercase transition-all';
+  render();
+}
+
+function setFiltroData(val) {
+  _filtroData = val;
+  _filtro = 'custom';
+  document.querySelectorAll('.filt-btn').forEach(b => {
+    b.className = 'filt-btn flex-1 py-1.5 rounded-xl bg-slate-800 border border-white/5 text-slate-500 font-black text-[9px] uppercase transition-all';
+  });
+  render();
+}
+
+function filtrar(list) {
+  const hj = hoje();
+  return list.filter(r => {
+    if (r.status === 'excluido') return false;
+    const d = (r.dataCurta || r.criadoEm || '').slice(0, 10);
+    if (_filtroData) return d === _filtroData;
+    if (_filtro === 'hoje') return d === hj;
+    if (_filtro === 'semana') {
+      const dias7 = new Date(); dias7.setDate(dias7.getDate() - 7);
+      return new Date(r.criadoEm) >= dias7;
+    }
+    if (_filtro === 'mes') return d.slice(0, 7) === hj.slice(0, 7);
+    return true;
+  });
+}
+
+/* ── KPIs ────────────────────────────────── */
+function atualizarKpis() {
+  const list = filtrar(getCambios()).filter(r => r.status !== 'cancelado');
+  const recebido = list.reduce((s, r) => s + (r.valorEntrada || 0), 0);
+  const pago     = list.reduce((s, r) => s + (r.valorSaida || 0), 0);
+  const lucro    = list.reduce((s, r) => s + (r.lucro || 0), 0);
+  document.getElementById('kpiRecebido').textContent = fmt(recebido);
+  document.getElementById('kpiPago').textContent = fmt(pago);
+  document.getElementById('kpiLucro').textContent = fmt(lucro);
+  document.getElementById('kpiRecebidoQtd').textContent = `${list.length} operação${list.length !== 1 ? 'ões' : ''}`;
+}
+
+/* ── Render lista ────────────────────────── */
+const FORMA_CORES = {
+  'Pix':           'b-blue',
+  'Cartão Débito': 'b-purple',
+  'Cartão Crédito':'b-amber',
+};
+
+function render() {
+  atualizarKpis();
+  const el = document.getElementById('listaRegistros');
+  const list = filtrar(getCambios()).sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
+
+  if (!list.length) {
+    el.innerHTML = `<p class="text-center text-slate-500 text-[10px] font-bold py-10">Nenhum câmbio no período</p>`;
+    return;
+  }
+
+  // Agrupa por data
+  const grupos = {};
+  list.forEach(r => {
+    const d = (r.dataCurta || r.criadoEm || '').slice(0, 10);
+    if (!grupos[d]) grupos[d] = [];
+    grupos[d].push(r);
+  });
+
+  const hj = hoje();
+  let html = '';
+  Object.keys(grupos).sort((a, b) => b.localeCompare(a)).forEach(data => {
+    const label = data === hj ? 'Hoje'
+      : new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'short' });
+    html += `<div class="date-sep">${label}</div>`;
+    grupos[data].forEach(r => {
+      const cancelado = r.status === 'cancelado';
+      const cls = cancelado ? 'cancelado' : 'entrada';
+      const corBadge = FORMA_CORES[r.formaEntrada] || 'b-slate';
+      html += `
+        <div class="cambio-card ${cls} cursor-pointer hover:border-white/15" onclick="abrirDetalhe('${r.id}')">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span class="badge ${corBadge}">${r.formaEntrada}</span>
+                ${cancelado ? '<span class="badge b-slate">Cancelado</span>' : ''}
+                ${r.cliente ? `<span class="text-[9px] text-slate-400 font-bold truncate max-w-[120px]">${r.cliente}</span>` : ''}
+              </div>
+              <div class="flex items-center gap-3">
+                <div>
+                  <p class="text-[8px] text-slate-500 font-bold uppercase">Recebeu</p>
+                  <p class="text-base font-black text-emerald-400">${fmt(r.valorEntrada)}</p>
+                </div>
+                <i class="fas fa-arrow-right text-slate-600 text-xs"></i>
+                <div>
+                  <p class="text-[8px] text-slate-500 font-bold uppercase">Entregou</p>
+                  <p class="text-base font-black text-amber-400">${fmt(r.valorSaida)}</p>
+                </div>
+                ${r.lucro > 0 ? `<div class="ml-auto text-right">
+                  <p class="text-[8px] text-slate-500 font-bold uppercase">Lucro</p>
+                  <p class="text-sm font-black text-blue-400">+${fmt(r.lucro)}</p>
+                </div>` : ''}
+              </div>
+              ${r.obs ? `<p class="text-[9px] text-slate-500 font-bold mt-1.5 truncate">📝 ${r.obs}</p>` : ''}
+            </div>
+            <div class="text-right flex-shrink-0">
+              <p class="text-[9px] text-slate-500 font-bold">${r.hora || ''}</p>
+              <p class="text-[8px] text-slate-600 font-bold">${tempoRelativo(r.criadoEm)}</p>
+            </div>
+          </div>
+        </div>`;
+    });
+  });
+
+  el.innerHTML = html;
+}
+
+/* ── Novo Registro ───────────────────────── */
+/* ── Taxas por forma ─────────────────────── */
+const TAXAS = {
+  'Pix':            0.10,   // 10%
+  'Cartão Débito':  0.15,   // 15%
+  'Cartão Crédito': 0.20,   // 20%
+};
+
+let _formaEntradaSel = null;
+
+function abrirNovoRegistro() {
+  _formaEntradaSel = null;
+  document.getElementById('novoCliente').value = '';
+  document.getElementById('novoValorEntrada').value = '';
+  document.getElementById('novoValorSaida').value = '';
+  document.getElementById('novoObs').value = '';
+  document.getElementById('previewLucro').classList.add('hidden');
+  document.getElementById('taxaLabel').classList.add('hidden');
+  document.querySelectorAll('#gridFormaEntrada .forma-btn').forEach(b => {
+    b.classList.remove('sel');
+    b.style.opacity = '';
+    b.style.boxShadow = '';
+  });
+  openModal('modalNovo');
+  setTimeout(() => document.getElementById('novoValorEntrada')?.focus(), 250);
+}
+
+function fecharModal() { closeModal('modalNovo'); }
+
+function selFormaEntrada(forma) {
+  _formaEntradaSel = forma;
+  document.querySelectorAll('#gridFormaEntrada .forma-btn').forEach(b => {
+    const isThis = b.dataset.forma === forma;
+    b.classList.toggle('sel', isThis);
+    b.style.opacity = isThis ? '1' : '0.45';
+    b.style.boxShadow = isThis ? '0 0 0 2px #f59e0b' : '';
+  });
+
+  // Mostra taxa ativa
+  const taxa = TAXAS[forma] || 0;
+  const taxaLabel = document.getElementById('taxaLabel');
+  if (taxaLabel) {
+    taxaLabel.textContent = `Taxa: ${(taxa * 100).toFixed(0)}%`;
+    taxaLabel.classList.remove('hidden');
+  }
+
+  // Auto-calcula valor espécie com base no que já foi digitado
+  const entrada = parseFloat(document.getElementById('novoValorEntrada')?.value) || 0;
+  if (entrada > 0) {
+    const saida = +(entrada / (1 + taxa)).toFixed(2);
+    document.getElementById('novoValorSaida').value = saida.toFixed(2);
+  }
+  calcLucro();
+}
+
+function calcLucro() {
+  const entrada = parseFloat(document.getElementById('novoValorEntrada')?.value) || 0;
+  const taxa    = TAXAS[_formaEntradaSel] || 0;
+
+  // Auto-preenche espécie se forma já selecionada e saida ainda não foi editada manualmente
+  // (só auto-fill se o campo estiver vazio ou se veio de selFormaEntrada — controlado por _autoFill)
+  if (_formaEntradaSel && entrada > 0) {
+    const saidaInput = document.getElementById('novoValorSaida');
+    const saidaAtual = parseFloat(saidaInput?.value) || 0;
+    const saidaEsperada = +(entrada / (1 + taxa)).toFixed(2);
+    // Auto-atualiza se o campo estiver vazio
+    if (!saidaAtual) {
+      saidaInput.value = saidaEsperada.toFixed(2);
+    }
+  }
+
+  const saida = parseFloat(document.getElementById('novoValorSaida')?.value) || 0;
+  const lucro = +(entrada - saida).toFixed(2);
+  const box   = document.getElementById('previewLucro');
+  const val   = document.getElementById('previewLucroVal');
+  const prev  = document.getElementById('previewTaxa');
+
+  if (entrada > 0 && saida > 0 && box && val) {
+    box.classList.remove('hidden');
+    val.textContent = fmt(lucro);
+    val.className = `text-base font-black ${lucro > 0 ? 'text-blue-400' : lucro < 0 ? 'text-red-400' : 'text-slate-400'}`;
+    if (prev && _formaEntradaSel) {
+      const pct = ((lucro / entrada) * 100).toFixed(1);
+      prev.textContent = `${(taxa*100).toFixed(0)}% sobre ${fmt(entrada)} = ${fmt(lucro)} (${pct}% real)`;
+    }
+  } else if (box) {
+    box.classList.add('hidden');
+  }
+}
+
+function salvarRegistro() {
+  const cliente     = document.getElementById('novoCliente').value.trim();
+  const valorEntrada = parseFloat(document.getElementById('novoValorEntrada').value) || 0;
+  const valorSaida   = parseFloat(document.getElementById('novoValorSaida').value) || 0;
+  const obs         = document.getElementById('novoObs').value.trim();
+
+  if (valorEntrada <= 0)     { showToast('Informe o valor recebido', '', 'error'); return; }
+  if (!_formaEntradaSel)     { showToast('Selecione a forma recebida', 'Pix, Débito ou Crédito', 'error'); return; }
+  if (valorSaida < 0)        { showToast('Valor entregue inválido', '', 'error'); return; }
+
+  const taxa = TAXAS[_formaEntradaSel] || 0;
+  const registro = {
+    id: _utils().generateId(),
+    criadoEm: nowISO(),
+    dataCurta: hoje(),
+    hora: nowTime(),
+    operador: _auth().getNome(),
+    cliente: cliente || '',
+    formaEntrada: _formaEntradaSel,
+    taxa,
+    taxaPct: Math.round(taxa * 100),
+    valorEntrada,
+    valorSaida,
+    lucro: +(valorEntrada - valorSaida).toFixed(2),
+    obs,
+    status: 'ativo',
+  };
+
+  mutateCambio(list => list.unshift(registro));
+
+  // Registra no financeiro (CH_VENDAS) para aparecer nos relatórios
+  if (window.CH?.Store?.mutateVendas) {
+    const vendaCambio = {
+      id:         registro.id,
+      criadoEm:  registro.criadoEm,
+      dataCurta: registro.dataCurta,
+      data:      registro.dataCurta,
+      hora:      registro.hora,
+      operador:  registro.operador,
+      cliente:   registro.cliente || '',
+      origem:    'cambio',
+      formaPgto: registro.formaEntrada,
+      total:     registro.valorEntrada,
+      subtotal:  registro.valorEntrada,
+      desconto:  0,
+      lucro:     registro.lucro,
+      status:    'concluida',
+      itens:     [{
+        nome:       `Câmbio ${registro.formaEntrada} → Espécie`,
+        quantidade: 1,
+        preco:      registro.valorEntrada,
+        lucro:      registro.lucro,
+      }],
+      _fbSynced: false,
+    };
+    window.CH.Store.mutateVendas(v => v.unshift(vendaCambio));
+    if (window.CH.SyncQueue) {
+      window.CH.SyncQueue.enqueue('salvar', 'vendas', [vendaCambio]);
+    }
+  }
+
+  // Sync Firestore câmbio
+  if (window.CH?.SyncQueue) {
+    window.CH.SyncQueue.enqueue('salvar', 'cambio', getCambios());
+  }
+
+  closeModal('modalNovo');
+  render();
+  showToast('Câmbio registrado!', `${_formaEntradaSel} ${fmt(valorEntrada)} → Espécie ${fmt(valorSaida)}`, 'success');
+}
+
+/* ── Detalhe ─────────────────────────────── */
+let _registroAtualId = null;
+
+function abrirDetalhe(id) {
+  const r = getCambios().find(x => x.id === id);
+  if (!r) return;
+  _registroAtualId = id;
+
+  const el = document.getElementById('detalheConteudo');
+  const cancelado = r.status === 'cancelado';
+
+  el.innerHTML = `
+    <div class="bg-slate-900/60 rounded-xl p-4 space-y-2.5">
+      <div class="flex justify-between"><span class="text-[9px] text-slate-500 font-black uppercase">Data/Hora</span><span class="text-[11px] font-bold">${new Date(r.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span></div>
+      ${r.cliente ? `<div class="flex justify-between"><span class="text-[9px] text-slate-500 font-black uppercase">Cliente</span><span class="text-[11px] font-bold">${r.cliente}</span></div>` : ''}
+      <div class="flex justify-between"><span class="text-[9px] text-slate-500 font-black uppercase">Operador</span><span class="text-[11px] font-bold">${r.operador||'—'}</span></div>
+      <div class="flex justify-between"><span class="text-[9px] text-slate-500 font-black uppercase">Forma recebida</span><span class="badge ${FORMA_CORES[r.formaEntrada]||'b-slate'}">${r.formaEntrada}</span></div>
+      <div class="flex justify-between"><span class="text-[9px] text-slate-500 font-black uppercase">Taxa cobrada</span><span class="text-[11px] font-black text-amber-400">${r.taxaPct || Math.round((TAXAS[r.formaEntrada]||0)*100)}%</span></div>
+    </div>
+    <div class="grid grid-cols-3 gap-2">
+      <div class="bg-emerald-900/20 border border-emerald-500/15 rounded-xl p-3 text-center">
+        <p class="text-[8px] text-emerald-400 font-black uppercase mb-1">Recebeu</p>
+        <p class="text-lg font-black text-emerald-400">${fmt(r.valorEntrada)}</p>
+        <p class="text-[8px] text-slate-500 font-bold">${r.formaEntrada}</p>
+      </div>
+      <div class="bg-amber-900/20 border border-amber-500/15 rounded-xl p-3 text-center">
+        <p class="text-[8px] text-amber-400 font-black uppercase mb-1">Entregou</p>
+        <p class="text-lg font-black text-amber-400">${fmt(r.valorSaida)}</p>
+        <p class="text-[8px] text-slate-500 font-bold">Espécie</p>
+      </div>
+      <div class="bg-blue-900/20 border border-blue-500/15 rounded-xl p-3 text-center">
+        <p class="text-[8px] text-blue-400 font-black uppercase mb-1">Lucro</p>
+        <p class="text-lg font-black ${r.lucro >= 0 ? 'text-blue-400' : 'text-red-400'}">${fmt(r.lucro)}</p>
+        <p class="text-[8px] text-slate-500 font-bold">Câmbio</p>
+      </div>
+    </div>
+    ${r.obs ? `<div class="bg-slate-900/40 border border-white/5 rounded-xl p-3"><p class="text-[8px] text-slate-500 font-black uppercase mb-1">Observação</p><p class="text-[11px] font-bold">${r.obs}</p></div>` : ''}
+    ${cancelado ? `<div class="bg-red-900/20 border border-red-500/20 rounded-xl p-3 text-center"><p class="text-red-400 font-black text-sm">⚠️ Cancelado</p>${r.canceladoEm ? `<p class="text-[9px] text-slate-500 font-bold mt-1">${new Date(r.canceladoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</p>` : ''}</div>` : ''}
+  `;
+
+  // Só admin pode cancelar/excluir e apenas se não estiver já cancelado
+  const btnCanc = document.getElementById('btnCancelarReg');
+  if (btnCanc) btnCanc.style.display = cancelado ? 'none' : '';
+
+  openModal('modalDetalhe');
+}
+
+function fecharDetalhe() { closeModal('modalDetalhe'); }
+
+function cancelarRegistro() {
+  if (!_registroAtualId) return;
+  if (!confirm('Cancelar esta operação de câmbio?')) return;
+  mutateCambio(list => {
+    const r = list.find(x => x.id === _registroAtualId);
+    if (r) { r.status = 'cancelado'; r.canceladoEm = new Date().toISOString(); }
+  });
+  // Marca como cancelado no financeiro também
+  if (window.CH?.Store?.mutateVendas) {
+    window.CH.Store.mutateVendas(list => {
+      const v = list.find(x => x.id === _registroAtualId);
+      if (v) v.status = 'cancelada';
+    });
+  }
+  if (window.CH?.SyncQueue) window.CH.SyncQueue.enqueue('salvar', 'cambio', getCambios());
+  closeModal('modalDetalhe');
+  render();
+  showToast('Operação cancelada', '', 'warning');
+}
+
+function excluirRegistro() {
+  if (!_registroAtualId) return;
+  if (!confirm('Excluir permanentemente este registro?')) return;
+  mutateCambio(list => {
+    const idx = list.findIndex(x => x.id === _registroAtualId);
+    if (idx >= 0) list.splice(idx, 1);
+  });
+  // Remove do financeiro também
+  if (window.CH?.Store?.mutateVendas) {
+    window.CH.Store.mutateVendas(list => {
+      const idx = list.findIndex(x => x.id === _registroAtualId);
+      if (idx >= 0) list.splice(idx, 1);
+    });
+  }
+  if (window.CH?.SyncQueue) window.CH.SyncQueue.enqueue('salvar', 'cambio', getCambios());
+  closeModal('modalDetalhe');
+  render();
+  showToast('Registro excluído', '', 'warning');
+}
+
+/* ── Modal helpers ───────────────────────── */
+function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
+function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+
+document.querySelectorAll('.modal').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+/* ── Init ────────────────────────────────── */
+function init() {
+  _ui().startClock('clock');
+  if (_auth().isAdmin()) document.body.classList.add('is-admin');
+  if (window.CH?.SyncService) {
+    window.CH.SyncService.pull().catch(() => {});
+  }
+  setFiltro('hoje');
+}
+
+/* ── Boot ────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  const { AuthService } = window.CH;
+  if (!_auth().isLogged()) { location.href = 'index.html'; return; }
+  document.getElementById('lock').classList.add('hidden');
+  init();
+});
+</script>
+</body>
+</html>

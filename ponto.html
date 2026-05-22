@@ -77,7 +77,7 @@ body{background-image:radial-gradient(ellipse at 50% 0%,rgba(16,185,129,.04) 0%,
 <div id="lock">
   <div style="background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.08);border-radius:2.5rem;padding:2.5rem;width:100%;max-width:360px;margin:0 1rem;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8);">
     <div class="text-5xl mb-4">⏱️</div>
-    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight"><span data-wl="nomeEmpresa">CH GELADAS</span></h1>
+    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight">CH <span class="text-emerald-400">GELADAS</span></h1>
     <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-8">Módulo de Ponto</p>
     <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
     <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
@@ -97,7 +97,7 @@ body{background-image:radial-gradient(ellipse at 50% 0%,rgba(16,185,129,.04) 0%,
     <div class="flex items-center gap-3">
       <span class="text-2xl">⏱️</span>
       <div>
-        <h1 class="text-[10px] font-black uppercase tracking-widest text-emerald-400"><span data-wl="nomeApp">Ponto</span></h1>
+        <h1 class="text-[10px] font-black uppercase tracking-widest text-emerald-400">Ponto</h1>
         <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
       </div>
     </div>
@@ -249,10 +249,6 @@ body{background-image:radial-gradient(ellipse at 50% 0%,rgba(16,185,129,.04) 0%,
   <script src="./services/auditService.js"></script>
   <script src="./services/syncMonitor.js"></script>
   <script src="./services/backupService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
 
 <script>
 'use strict';
@@ -310,7 +306,6 @@ let _tabAtual = 'hoje';
    INIT
 ════════════════════════════════ */
 function init() {
-  window.CH?.WhitelabelService?.aplicar?.({});
   UIService.startClock('clock');
   iniciarCaixa();
   _iniciarRelogioGrande();
@@ -755,11 +750,12 @@ function abrirCaixa() {
   const troco = parseFloat(document.getElementById('caixaTrocoInicial')?.value)||0;
   const obs   = document.getElementById('caixaObs')?.value.trim()||'';
   _caixaAtual = {
-    id:        Utils.generateId(),
-    abertoEm:  new Date().toISOString(),
+    id:           Utils.generateId(),
+    turnoId:      Utils.generateId(), // identifica o turno; usado para filtrar vendas na virada da meia-noite
+    abertoEm:     new Date().toISOString(),
     trocoInicial: troco,
     obs,
-    operador:  AuthService.getNome(),
+    operador:     AuthService.getNome(),
   };
   _caixaAberto = true;
   try { localStorage.setItem('CH_CAIXA_ATUAL', JSON.stringify(_caixaAtual)); } catch(_) {}
@@ -772,8 +768,15 @@ function fecharCaixa() {
   if (!confirm('Fechar o caixa agora?')) return;
 
   const trocoInicial = _caixaAtual.trocoInicial||0;
-  const hoje         = Utils.todayISO();
-  const vendas       = Store.getVendas().filter(v => v.dataCurta === hoje);
+
+  // Filtra as vendas do turno pelo timestamp de abertura do caixa —
+  // corrige o bug de virada de meia-noite onde todayISO() muda para o
+  // dia seguinte mas vendas do turno ainda têm dataCurta do dia anterior.
+  const abertoEm = new Date(_caixaAtual.abertoEm);
+  const vendas   = Store.getVendas().filter(v => {
+    const ts = v.criadoEm || v.timestamp || '';
+    return ts ? new Date(ts) >= abertoEm : v.dataCurta === Utils.todayISO();
+  });
   const dinheiro     = vendas
     .filter(v => (v.formaPgto||'').toLowerCase().includes('dinheiro'))
     .reduce((s,v) => s+v.total, 0);
@@ -786,6 +789,7 @@ function fecharCaixa() {
     dinheiro,
     totalCaixa,
     qtdVendas:   vendas.length,
+    // turnoId já herdado de _caixaAtual via spread acima
   };
 
   // Salva no ponto como registro especial

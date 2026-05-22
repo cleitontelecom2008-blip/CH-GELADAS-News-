@@ -78,7 +78,7 @@ body.is-admin .adm-only.block-only{display:block!important;}
 <div id="lock">
   <div style="background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.08);border-radius:2.5rem;padding:2.5rem;width:100%;max-width:360px;margin:0 1rem;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8);">
     <div class="text-5xl mb-4">💜</div>
-    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight"><span data-wl="nomeEmpresa">CH GELADAS</span></h1>
+    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight">CH <span class="text-purple-400">GELADAS</span></h1>
     <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-8">Módulo Financeiro</p>
     <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
     <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
@@ -98,7 +98,7 @@ body.is-admin .adm-only.block-only{display:block!important;}
     <div class="flex items-center gap-3">
       <span class="text-2xl">💜</span>
       <div>
-        <h1 class="text-[10px] font-black uppercase tracking-widest text-purple-400"><span data-wl="nomeApp">Financeiro</span></h1>
+        <h1 class="text-[10px] font-black uppercase tracking-widest text-purple-400">Financeiro</h1>
         <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
       </div>
     </div>
@@ -246,11 +246,6 @@ body.is-admin .adm-only.block-only{display:block!important;}
 
   <script src="./services/estoqueService.js"></script>
   <script src="./services/financeiroService.js"></script>
-  <script src="./services/biService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
 <script>
 'use strict';
 
@@ -307,7 +302,6 @@ let _periodo = 'hoje';
    INIT
 ═══════════════════════════════════ */
 function init() {
-  window.CH?.WhitelabelService?.aplicar?.({});
   UIService.startClock('clock');
   renderTudo();
   EventBus.on('store:updated', renderTudo);

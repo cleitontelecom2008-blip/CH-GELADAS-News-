@@ -52,7 +52,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#060810;background-im
 <div id="lock">
   <div style="background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.08);border-radius:2.5rem;padding:2.5rem;width:100%;max-width:360px;margin:0 1rem;text-align:center;">
     <div class="text-5xl mb-4">📦</div>
-    <h1 class="text-2xl font-black mb-1 uppercase"><span data-wl="nomeEmpresa">CH GELADAS</span></h1>
+    <h1 class="text-2xl font-black mb-1 uppercase">CH <span class="text-emerald-400">GELADAS</span></h1>
     <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-8">Módulo de Estoque</p>
     <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
     <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
@@ -68,7 +68,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#060810;background-im
       <span class="text-2xl">📦</span>
       <div>
         <div class="flex items-center gap-2">
-          <h1 class="text-[10px] font-black uppercase tracking-widest text-emerald-400"><span data-wl="nomeApp">Estoque</span></h1>
+          <h1 class="text-[10px] font-black uppercase tracking-widest text-emerald-400">Estoque</h1>
           <span id="roleTag" class="badge b-green hidden"></span>
         </div>
         <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
@@ -287,11 +287,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#060810;background-im
   <script src="./services/backupService.js"></script>
 
   <script src="./services/estoqueService.js"></script>
-  <script src="./services/errorPreventionService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
 <script>
 'use strict';
 let _packsForm=[],_packsEdit=[],_qtdOrig=0;
@@ -360,7 +355,7 @@ function excluirProduto(id){const p=Store.getEstoque().find(x=>x.id===id);if(!p|
 let _auditFiltro = 'todos';
 function setAuditFiltro(f){_auditFiltro=f;document.querySelectorAll('.audit-f-btn').forEach(b=>{const active=b.id==='auditF-'+f;b.className=`audit-f-btn px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${active?'bg-emerald-600/20 text-emerald-300 border border-emerald-500/25':'bg-slate-800 text-slate-500 border border-white/5'}`;});renderAudit();}
 
-function renderAudit(){const busca=(document.getElementById('auditBusca')?.value||'').toLowerCase();let logs=Store.getAuditEstoque();// KPIs
+function renderAudit(){const busca=(document.getElementById('auditBusca')?.value||'').toLowerCase();let logs=(Store.getAuditoria?.() || []).filter(r => r.modulo === 'estoque');// KPIs
 const kpiEl=document.getElementById('auditKpis');if(kpiEl){const tot=logs.length,ent=logs.filter(l=>_tipoAudit(l)==='entrada').length,sai=logs.filter(l=>_tipoAudit(l)==='saida').length,ava=logs.filter(l=>_tipoAudit(l)==='avaria').length;kpiEl.innerHTML=`<div class="stat !p-3 text-center border-l-4 border-emerald-500"><p class="text-[7px] text-slate-600 uppercase font-bold">Total</p><p class="text-lg font-black text-white">${tot}</p></div><div class="stat !p-3 text-center border-l-4 border-blue-500"><p class="text-[7px] text-slate-600 uppercase font-bold">Entradas</p><p class="text-lg font-black text-blue-400">${ent}</p></div><div class="stat !p-3 text-center border-l-4 border-amber-500"><p class="text-[7px] text-slate-600 uppercase font-bold">Saídas</p><p class="text-lg font-black text-amber-400">${sai}</p></div><div class="stat !p-3 text-center border-l-4 border-red-500"><p class="text-[7px] text-slate-600 uppercase font-bold">Avarias</p><p class="text-lg font-black text-red-400">${ava}</p></div>`;}
 // Filtro tipo
 if(_auditFiltro!=='todos') logs=logs.filter(l=>_tipoAudit(l)===_auditFiltro);
@@ -379,7 +374,7 @@ function criarCategoria(){const nome=document.getElementById('novaCatInput')?.va
 
 function excluirCategoria(nome){if(!confirm(`Excluir categoria "${nome}"?\nOs produtos desta categoria ficarão sem categoria.`))return;Store.mutateConfig(cfg=>{if(Array.isArray(cfg.categorias))cfg.categorias=cfg.categorias.filter(c=>c!==nome);});Store.mutateEstoque(est=>{est.forEach(p=>{if(p.categoria===nome)p.categoria='';});});renderFiltros();renderCatsGerenciar();UIService.showToast('Categoria excluída',nome,'warning');}
 
-function baixarAuditoria(){const logs=Store.getAuditEstoque();let txt=`AUDITORIA DE ESTOQUE — ${Utils.today()}\n${'═'.repeat(50)}\n\n`;logs.forEach((l,i)=>{const d=l.delta||(l.depois-l.antes);txt+=`#${i+1} | ${l.criadoEm?new Date(l.criadoEm).toLocaleString('pt-BR'):l.data}\nProduto: ${l.prodNome||'—'}\nAjuste: ${d>0?'+':''}${d} un (${l.antes??'?'} → ${l.depois??'?'})\nMotivo: ${l.motivo||'—'}\n\n`;});Utils.downloadBlob(txt,'text/plain;charset=utf-8;',`auditoria_estoque_${Utils.todayISO()}.txt`);UIService.showToast('Auditoria exportada!','','success');}
+function baixarAuditoria(){const logs=(Store.getAuditoria?.() || []).filter(r => r.modulo === 'estoque');let txt=`AUDITORIA DE ESTOQUE — ${Utils.today()}\n${'═'.repeat(50)}\n\n`;logs.forEach((l,i)=>{const d=l.delta||(l.depois-l.antes);txt+=`#${i+1} | ${l.criadoEm?new Date(l.criadoEm).toLocaleString('pt-BR'):l.data}\nProduto: ${l.prodNome||'—'}\nAjuste: ${d>0?'+':''}${d} un (${l.antes??'?'} → ${l.depois??'?'})\nMotivo: ${l.motivo||'—'}\n\n`;});Utils.downloadBlob(txt,'text/plain;charset=utf-8;',`auditoria_estoque_${Utils.todayISO()}.txt`);UIService.showToast('Auditoria exportada!','','success');}
 
 function abrirRelatorio(){const estoque=Store.getEstoque();const thr=Store.getConfig()?.alertaEstoque||3;const esgotados=estoque.filter(p=>(p.qtdUn||0)<=0);const baixos=estoque.filter(p=>p.qtdUn>0&&p.qtdUn<=thr);const valor=estoque.reduce((s,p)=>s+(p.custoUn||0)*(p.qtdUn||0),0);_setText('rTotal',estoque.length);_setText('rValor',Utils.formatCurrency(valor));_setText('rBaixo',baixos.length);_setText('rEsgotado',esgotados.length);_setText('relData',Utils.today());const criticos=[...esgotados,...baixos.filter(p=>!esgotados.find(e=>e.id===p.id))].slice(0,10);document.getElementById('rCriticos').innerHTML=criticos.map(p=>`<div class="flex items-center justify-between bg-slate-900/60 border border-white/5 rounded-xl px-3 py-2"><span class="text-[10px] font-black text-slate-300">${(p.qtdUn||0)<=0?'❌':'⚠️'} ${p.nome}</span><span class="text-[10px] font-black ${(p.qtdUn||0)<=0?'text-red-400':'text-amber-400'}">${p.qtdUn||0} un</span></div>`).join('')||'<p class="text-[9px] text-slate-600 text-center py-2 font-bold">✅ Nenhum crítico</p>';document.getElementById('rTodos').innerHTML=[...estoque].sort((a,b)=>(a.qtdUn||0)-(b.qtdUn||0)).map(p=>`<div class="flex justify-between items-center py-1.5 border-b border-white/5"><span class="text-[10px] font-bold text-slate-300 truncate flex-1">${p.nome}</span><span class="text-[10px] font-black text-slate-400 ml-2">${p.qtdUn||0} un</span><span class="text-[10px] font-black text-blue-400 ml-3 flex-shrink-0">${Utils.formatCurrency(p.precoUn)}</span></div>`).join('');UIService.openModal('modalRelatorio');}
 
@@ -390,7 +385,6 @@ function baixarRelatorio(){Utils.downloadBlob(_gerarTextoRelatorio(),'text/plain
 function _setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 
 window.addEventListener('DOMContentLoaded', () => {
-  window.CH?.WhitelabelService?.aplicar?.({});
   if (!AuthService.isLogged()) { location.href = 'index.html'; return; }
   document.getElementById('lock').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');

@@ -109,7 +109,7 @@ body.is-admin .adm-only{display:flex!important;}
 <div id="lock">
   <div style="background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.08);border-radius:2.5rem;padding:2.5rem;width:100%;max-width:360px;margin:0 1rem;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8);">
     <div class="text-5xl mb-4">🤝</div>
-    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight"><span data-wl="nomeEmpresa">CH GELADAS</span></h1>
+    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight">CH <span class="text-red-400">GELADAS</span></h1>
     <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-8">Módulo de Fiado</p>
     <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
     <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
@@ -131,7 +131,7 @@ body.is-admin .adm-only{display:flex!important;}
       </button>
       <span class="text-2xl">🤝</span>
       <div>
-        <h1 id="headerTitulo" class="text-[10px] font-black uppercase tracking-widest text-red-400"><span data-wl="nomeApp">Fiado</span></h1>
+        <h1 id="headerTitulo" class="text-[10px] font-black uppercase tracking-widest text-red-400">Fiado</h1>
         <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
       </div>
     </div>
@@ -209,6 +209,9 @@ body.is-admin .adm-only{display:flex!important;}
         </button>
         <button onclick="zerarSaldoCliente()" class="adm-only py-3 rounded-2xl bg-amber-600/20 border border-amber-500/25 text-amber-300 font-black text-[9px] uppercase flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-amber-600/35">
           <i class="fas fa-eraser text-base"></i>Zerar
+        </button>
+        <button id="btnExcluirCliente" onclick="excluirCliente()" class="adm-only py-3 rounded-2xl bg-red-900/30 border border-red-500/25 text-red-400 font-black text-[9px] uppercase flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-red-900/50">
+          <i class="fas fa-user-times text-base"></i>Excluir
         </button>
       </div>
     </div>
@@ -413,10 +416,6 @@ body.is-admin .adm-only{display:flex!important;}
   <script src="./services/auditService.js"></script>
   <script src="./services/syncMonitor.js"></script>
   <script src="./services/backupService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
 
 <script>
 'use strict';
@@ -467,11 +466,21 @@ let _clienteAtualId = null;
 
 /* ═══════════ INIT ═══════════ */
 function init() {
-  window.CH?.WhitelabelService?.aplicar?.({});
   UIService.startClock('clock');
   if (AuthService.isAdmin()) document.body.classList.add('is-admin');
-  atualizarKpis();
-  renderClientes();
+  // Força pull do Firestore para carregar dados atualizados em qualquer aparelho
+  if (window.CH?.SyncService) {
+    window.CH.SyncService.pull(['fiado']).then(() => {
+      atualizarKpis();
+      renderClientes();
+    }).catch(() => {
+      atualizarKpis();
+      renderClientes();
+    });
+  } else {
+    atualizarKpis();
+    renderClientes();
+  }
   EventBus.on('store:updated', () => { atualizarKpis(); if (_clienteAtualId) renderDetalhe(); else renderClientes(); });
 }
 
@@ -569,6 +578,17 @@ function renderDetalhe() {
   }
   const saldoEl = document.getElementById('detSaldo');
   if (saldoEl) saldoEl.className = `text-3xl font-black ${quitado ? 'text-emerald-400' : 'text-red-400'}`;
+
+  // Botão excluir: só visível quando quitado (saldo=0)
+  const btnExcluir = document.getElementById('btnExcluirCliente');
+  if (btnExcluir) {
+    if (quitado && AuthService.isAdmin()) {
+      btnExcluir.style.display = 'flex';
+      btnExcluir.title = 'Excluir cliente (saldo zerado)';
+    } else {
+      btnExcluir.style.display = 'none';
+    }
+  }
 
   // Renderiza com abas: Compras | Pagamentos
   _renderDetalheAbas(c);
@@ -788,14 +808,39 @@ function confirmarLancamento() {
   const desc  = (document.getElementById('fLancarDesc')?.value||'').trim()||'Compra fiado';
   if (valor <= 0) { UIService.showToast('Valor inválido','','error'); return; }
 
+  let _nomeCliente = '';
   Store.mutateFiado(fiado => {
     const c = fiado.find(x=>x.id===_clienteAtualId);
     if (!c) return;
+    _nomeCliente = c.nome;
     c.saldo = (c.saldo||0) + valor;
     if (!Array.isArray(c.movimentacoes)) c.movimentacoes = [];
     c.movimentacoes.unshift({ id:Utils.generateId(), tipo:'fiado', descricao:desc, valor, criadoEm:new Date().toISOString() });
     if (c.limite>0 && c.saldo >= c.limite) c.bloqueado = true;
   });
+
+  // Registra no financeiro como venda fiado pendente
+  Store.mutateVendas(vendas => {
+    vendas.unshift({
+      id:             Utils.generateId(),
+      dataCurta:      Utils.todayISO(),
+      data:           Utils.today(),
+      hora:           Utils.nowTime(),
+      criadoEm:       new Date().toISOString(),
+      itens:          [{ nome: desc, quantidade: 1, preco: valor, lucro: 0 }],
+      total:          valor,
+      subtotal:       valor,
+      desconto:       0,
+      lucro:          0,
+      formaPgto:      'Fiado',
+      origem:         'FIADO-LANCAMENTO',
+      status:         'pendente',
+      nomeCliente:    _nomeCliente,
+      _fiadoClienteId: _clienteAtualId,
+      _fiado:         true,
+    });
+  });
+  if (window.CH?.SyncQueue) window.CH.SyncQueue.enqueue('salvar', 'fiado', Store.getFiado());
 
   UIService.closeModal('modalLancar');
   UIService.showToast(`+${Utils.formatCurrency(valor)} fiado`, desc, 'warning');
@@ -1147,6 +1192,23 @@ function apagarMovimentacao(movId) {
   });
   UIService.showToast('Movimentação apagada','','warning');
   renderDetalhe();
+}
+
+function excluirCliente() {
+  if (!AuthService.isAdmin()) return;
+  const c = Store.getFiado().find(x=>x.id===_clienteAtualId);
+  if (!c) return;
+  if ((c.saldo||0) > 0) {
+    UIService.showToast('Não é possível excluir', 'Cliente ainda tem saldo devedor', 'error');
+    return;
+  }
+  if (!confirm(`Excluir o cliente "${c.nome}" permanentemente?\nEsta ação não pode ser desfeita.`)) return;
+  Store.mutateFiado(fiado => {
+    const idx = fiado.findIndex(x=>x.id===_clienteAtualId);
+    if (idx>=0) fiado.splice(idx,1);
+  });
+  UIService.showToast('Cliente excluído', c.nome, 'warning');
+  voltarLista();
 }
 
 window.addEventListener('DOMContentLoaded', () => {

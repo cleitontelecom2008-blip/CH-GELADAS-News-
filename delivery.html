@@ -70,7 +70,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <div id="lock">
   <div style="background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.08);border-radius:2.5rem;padding:2.5rem;width:100%;max-width:360px;margin:0 1rem;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8);">
     <div class="text-5xl mb-4">🛵</div>
-    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight"><span data-wl="nomeEmpresa">CH GELADAS</span></h1>
+    <h1 class="text-2xl font-black mb-1 uppercase tracking-tight">CH <span class="text-orange-400">GELADAS</span></h1>
     <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-8">Módulo de Delivery</p>
     <input type="text" id="loginNome" autocomplete="username" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-3" placeholder="👤 Usuário">
     <input type="password" id="loginSenha" autocomplete="current-password" class="w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 p-4 rounded-2xl text-left outline-none text-white transition-all font-sans mb-4" placeholder="🔒 Senha">
@@ -89,7 +89,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="flex items-center gap-3">
       <span class="text-2xl">🛵</span>
       <div>
-        <h1 class="text-[10px] font-black uppercase tracking-widest text-orange-400"><span data-wl="nomeApp">Delivery</span></h1>
+        <h1 class="text-[10px] font-black uppercase tracking-widest text-orange-400">Delivery</h1>
         <p id="clock" class="text-[9px] font-mono text-slate-600 mt-0.5">00:00:00</p>
       </div>
     </div>
@@ -289,11 +289,6 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <script src="./services/estoqueService.js"></script>
   <script src="./services/financeiroService.js"></script>
   <script src="./services/vendasService.js"></script>
-  <script src="./services/errorPreventionService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
 
 <script>
 'use strict';
@@ -345,7 +340,6 @@ let _itensPedidoForm = []; // [{prodId, nome, preco, qtd}]
 
 /* ═══════════ INIT ═══════════ */
 function init() {
-  window.CH?.WhitelabelService?.aplicar?.({});
   UIService.startClock('clock');
   popularSelectProdutos();
   preencherEntregadores();
@@ -570,34 +564,6 @@ async function avancarStatus(id, novoStatus) {
       preco:  i.preco,  custo: i.custo||0,
       label: 'UNID',   qtd:  i.qtd,
     }));
-
-    // ── Validação preventiva (ErrorPreventionService) ─────────────
-    const EP = window.CH?.ErrorPreventionService;
-    if (EP) {
-      const cartFake = { getItems: () => itens, getTotal: () => p.total||0, getSubtotal: () => p.subtotal||(p.total||0), getDesconto: () => 0 };
-      const { ok, erros, avisos } = EP.validarCarrinho(cartFake);
-      if (!ok) {
-        UIService.showToast('Entrega bloqueada', erros[0].msg, 'error');
-        window.CH?.SoundService?.error();
-        // Reverte status
-        Store.mutatePedidos(pedidos => {
-          const px = pedidos.find(x=>x.id===id);
-          if (px) { px.status = 'Saiu para entrega'; delete px.atualizadoEm; }
-        });
-        renderPedidos();
-        return;
-      }
-      if (avisos.length) {
-        if (!confirm('⚠️ Atenção:\n\n' + avisos.map(a=>'• '+a.msg).join('\n') + '\n\nConfirmar entrega?')) {
-          Store.mutatePedidos(pedidos => {
-            const px = pedidos.find(x=>x.id===id);
-            if (px) px.status = 'Saiu para entrega';
-          });
-          renderPedidos();
-          return;
-        }
-      }
-    }
 
     // Monta proxy de CartService para VendasService
     const cartProxy = {

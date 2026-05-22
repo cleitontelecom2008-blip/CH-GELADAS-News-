@@ -239,7 +239,7 @@ body::before {
 .c-red    { --accent: #ef4444; }
 .c-teal   { --accent: #14b8a6; }
 .c-amber  { --accent: #f59e0b; }
-.c-slate  { --accent: #64748b; }
+.c-indigo { --accent: #6366f1; }
 
 .app-card::before { background: var(--accent, #3b82f6); }
 .app-card:hover   { border-color: color-mix(in srgb, var(--accent,#3b82f6) 30%, transparent); }
@@ -521,12 +521,6 @@ body.is-admin .valid-only { display: block; }
       <div class="app-desc">Nova empresa SaaS</div>
     </a>
 
-    <a href="saas-login.html" class="app-card c-blue" data-modulo="saas_login" style="animation-delay:.12s">
-      <div class="app-icon">🔑</div>
-      <div class="app-name">Login SaaS</div>
-      <div class="app-desc">Acesso de cliente</div>
-    </a>
-
     <!-- ESTOQUE -->
     <a href="estoque.html" class="app-card c-green" data-modulo="estoque" style="animation-delay:.1s;display:none">
       <div class="app-badge" id="badgeEstoque"></div>
@@ -540,6 +534,14 @@ body.is-admin .valid-only { display: block; }
       <div class="app-icon">📊</div>
       <div class="app-name">Financeiro</div>
       <div class="app-desc">Lucro · Caixa · Relatórios</div>
+    </a>
+
+    <!-- SAÍDAS -->
+    <a href="saidas.html" class="app-card c-red" data-modulo="financeiro" style="animation-delay:.17s;display:none">
+      <div class="app-badge" id="badgeSaidas"></div>
+      <div class="app-icon">💸</div>
+      <div class="app-name">Saídas</div>
+      <div class="app-desc">Compras · Retiradas · Despesas</div>
     </a>
 
     <!-- COMANDA -->
@@ -564,6 +566,13 @@ body.is-admin .valid-only { display: block; }
       <div class="app-icon">🤝</div>
       <div class="app-name">Fiado</div>
       <div class="app-desc">Clientes · Saldo · Receber</div>
+    </a>
+
+    <!-- CÂMBIO -->
+    <a href="cambio.html" class="app-card c-amber" data-modulo="cambio" style="animation-delay:.33s">
+      <div class="app-icon">💱</div>
+      <div class="app-name">Câmbio</div>
+      <div class="app-desc">Pix/Cartão → Espécie</div>
     </a>
 
     <!-- PONTO -->
@@ -602,24 +611,18 @@ body.is-admin .valid-only { display: block; }
       <div class="app-desc">Equipe · PINs · Permissões</div>
     </div>
 
+    <!-- DASHBOARD BI (relatorios) -->
+    <a href="bi-dashboard.html" class="app-card c-indigo" data-modulo="relatorios" style="animation-delay:.48s;display:none">
+      <div class="app-icon">📊</div>
+      <div class="app-name">Dashboard BI</div>
+      <div class="app-desc">Custos · Margem · Análises</div>
+    </a>
+
     <!-- MONITOR (admin only) -->
     <a href="monitor.html" class="app-card c-slate" data-modulo="__adm__" style="animation-delay:.5s;display:none">
       <div class="app-icon">📊</div>
       <div class="app-name">Monitor</div>
       <div class="app-desc">Sync · Backup · Auditoria</div>
-
-    <!-- BI DASHBOARD (admin/gerente/analista only) -->
-    <a href="bi-dashboard.html" class="app-card c-blue" data-modulo="__adm__" style="animation-delay:.55s;display:none">
-      <div class="app-icon">📈</div>
-      <div class="app-name">Dashboard BI</div>
-      <div class="app-desc">Curva ABC · CMV · Analytics</div>
-    </a>
-
-    <!-- ASSINATURA / BILLING (admin only) -->
-    <a href="assinatura.html" class="app-card c-amber" data-modulo="__adm__" style="animation-delay:.60s;display:none">
-      <div class="app-icon">💳</div>
-      <div class="app-name">Planos</div>
-      <div class="app-desc">Assinatura · PIX · Billing</div>
     </a>
 
   </div>
@@ -815,12 +818,6 @@ body.is-admin .valid-only { display: block; }
   <script src="./services/financeiroService.js"></script>
   <script src="./services/vendasService.js"></script>
   <script src="./services/aprovacaoService.js"></script>
-  <script src="./services/featureFlagsService.js"></script>
-  <script src="./services/biService.js"></script>
-  <script src="./services/soundService.js"></script>
-  <script src="./services/whitelabelService.js"></script>
-  <script src="./services/filialService.js"></script>
-  <script src="./services/billingService.js"></script>
 
 <script>
 'use strict';
@@ -1581,9 +1578,22 @@ function _aplicarPermissoesHub() {
       card.style.display = isAdm ? '' : 'none';
       return;
     }
-    // saas_register: sempre visível
+    // saas_register: apenas admin
     if (mod === 'saas_register') {
-      card.style.display = '';
+      card.style.display = isAdm ? '' : 'none';
+      return;
+    }
+    // relatorios: admin ou quem tem acesso ao módulo
+    if (mod === 'relatorios') {
+      const ok = isAdm || (Perm && Perm.temAcesso(role, 'relatorios'));
+      card.style.display = ok ? '' : 'none';
+      return;
+    }
+    // cambio: apenas admin/gerente (não colaborador)
+    if (mod === 'cambio') {
+      const PODE_CAMBIO = ['adm','admin','gerente'];
+      const ok = PODE_CAMBIO.includes(role) || (Perm && Perm.temAcesso(role,'cambio'));
+      card.style.display = ok ? '' : 'none';
       return;
     }
     const ok = isAdm || (Perm && Perm.temAcesso(role, mod));
@@ -1636,55 +1646,15 @@ function showToast(title, sub='', type='success') {
    INIT CHECK — se já logado
 ══════════════════════════════════ */
 window.addEventListener('DOMContentLoaded', () => {
-  // ── Detecta sessão SaaS (clientes) além do auth local (PIN) ──
-  const _saasSess = window.CH?.SaasService?.getSession?.();
-  if (_saasSess && !AuthService.isLogged()) {
-    // Mapeia role SaaS → role local para permissões de UI
-    const _saasRoleMap = { dono:'adm', gerente:'gerente', caixa:'operador', colaborador:'colaborador' };
-    const _saasRole = _saasRoleMap[_saasSess.role] || 'colaborador';
-    // Injeta sessão temporária no AuthService para que _aplicarPermissoesHub funcione
-    AuthService._saasInject?.(_saasRole);
-  }
-
-  if (AuthService.isLogged() || _saasSess) {
+  if (AuthService.isLogged()) {
     document.getElementById('lock').style.display = 'none';
     document.getElementById('hub').classList.add('show');
-    const _role2 = AuthService.getRole() || (_saasSess?.role === 'dono' ? 'adm' : 'colaborador');
+    const _role2 = AuthService.getRole();
     if (['adm','admin'].includes(_role2)) document.body.classList.add('is-admin');
     if (_role2 === 'controlador') document.body.classList.add('is-controlador');
     if (_role2 === 'validador')   document.body.classList.add('is-validador');
-    // Mostra nome/empresa SaaS na topbar se sessão SaaS
-    if (_saasSess) {
-      const _topNome = document.getElementById('topNome');
-      if (_topNome) _topNome.textContent = _saasSess.nome + (_saasSess.nomeEmpresa ? ` · ${_saasSess.nomeEmpresa}` : '');
-    }
     iniciarHub();
     setTimeout(_aplicarPermissoesHub, 100);
-
-    // ── Feature Flags: intercepta cliques nos cards de módulo ────
-    // Mapeamento card → flag necessária
-    const _modGuards = {
-      'delivery.html':    'delivery',
-      'comanda.html':     'comanda',
-      'fiado.html':       'fiado',
-      'financeiro.html':  'financeiro',
-      'bi-dashboard.html':'bi_avancado',
-      'assinatura.html':  null, // sempre acessível
-    };
-
-    document.querySelectorAll('.app-card[href]').forEach(card => {
-      const href  = card.getAttribute('href');
-      const flag  = _modGuards[href];
-      if (!flag) return; // sem guarda, deixa passar
-      card.addEventListener('click', function(e) {
-        const FF = window.CH?.FeatureFlags;
-        if (!FF) return; // sem flags, deixa passar (standalone)
-        if (!FF.pode(flag)) {
-          e.preventDefault();
-          FF.exigir(flag); // exibe toast de upgrade + som denied
-        }
-      });
-    });
   } else {
     setTimeout(() => document.getElementById('loginNome')?.focus(), 300);
   }

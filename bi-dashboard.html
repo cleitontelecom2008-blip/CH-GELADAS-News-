@@ -358,6 +358,7 @@
     <!-- Tabs -->
     <div class="tabs">
       <button class="tab active" onclick="switchTab('visao-geral')">Visão Geral</button>
+      <button class="tab" onclick="switchTab('custos')">💰 Custos</button>
       <button class="tab" onclick="switchTab('abc')">Curva ABC</button>
       <button class="tab" onclick="switchTab('financeiro')">Financeiro</button>
       <button class="tab" onclick="switchTab('produtos')">Produtos</button>
@@ -380,7 +381,7 @@
         </div>
         <div class="chart-card full">
           <div class="chart-title">Fluxo de Caixa</div>
-          <div class="chart-subtitle" id="sub-fluxo">Receita diária no período</div>
+          <div class="chart-subtitle" id="sub-fluxo">Receita, custo e resultado diário no período</div>
           <div class="chart-wrap tall"><canvas id="chart-fluxo"></canvas></div>
         </div>
       </div>
@@ -389,6 +390,67 @@
         <div class="compare-grid" id="compare-grid"></div>
       </div>
     </div>
+
+    <!-- Tab: Custos ───────────────────────────────────────────── -->
+    <div id="tab-custos" class="tab-content">
+
+      <!-- KPI row de custos -->
+      <div class="kpi-grid" id="custos-kpi-grid" style="margin-bottom:16px"></div>
+
+      <div class="charts-grid">
+        <!-- Composição dos custos -->
+        <div class="chart-card">
+          <div class="chart-title">Composição dos Custos</div>
+          <div class="chart-subtitle">CMV vs Despesas Operacionais vs Resultado</div>
+          <div class="chart-wrap"><canvas id="chart-custos-comp"></canvas></div>
+        </div>
+
+        <!-- Despesas por categoria -->
+        <div class="chart-card">
+          <div class="chart-title">Despesas por Categoria</div>
+          <div class="chart-subtitle">Distribuição das despesas operacionais</div>
+          <div id="custos-sem-desp" class="empty-state" style="display:none">
+            Nenhuma despesa operacional registrada no período.
+          </div>
+          <div class="chart-wrap" id="custos-cat-wrap"><canvas id="chart-custos-cat"></canvas></div>
+        </div>
+
+        <!-- Receita × Custo × Resultado por dia -->
+        <div class="chart-card full">
+          <div class="chart-title">Receita × Custo Total × Resultado — por Dia</div>
+          <div class="chart-subtitle" id="sub-custos-fluxo">Evolução diária no período selecionado</div>
+          <div class="chart-wrap tall"><canvas id="chart-custos-fluxo"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Tabela de despesas registradas -->
+      <div class="section-title" id="custos-desp-title">Detalhamento de Despesas Registradas</div>
+      <div class="chart-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Hora</th>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th>Operador</th>
+                <th class="text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody id="custos-desp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Resumo final -->
+      <div class="section-title">Resumo Financeiro Completo</div>
+      <div class="chart-card">
+        <div id="custos-resumo-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:4px 0"></div>
+      </div>
+
+    </div>
+    <!-- /tab-custos -->
 
     <!-- Tab: ABC -->
     <div id="tab-abc" class="tab-content">
@@ -549,8 +611,15 @@ let _ate = hj();
 const _charts = {};
 
 // ── Período helpers ─────────────────────────────────────────────────
-function hj()         { return new Date().toISOString().slice(0,10); }
-function _diasAtras(n){ const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10); }
+function hj() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function _diasAtras(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 function _mesAtualDe(){ const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`; }
 
 function setPeriodo(d) {
@@ -586,11 +655,12 @@ function switchTab(id) {
   document.getElementById(`tab-${id}`)?.classList.add('active');
   event.target.classList.add('active');
   // Lazy render específico por tab
-  if (id === 'abc')        renderABC();
-  if (id === 'financeiro') renderFinanceiro();
-  if (id === 'produtos')   renderProdutos();
-  if (id === 'tempo')      renderTempo();
-  if (id === 'parados')    renderParados();
+  if (id === 'custos')      renderCustos();
+  if (id === 'abc')         renderABC();
+  if (id === 'financeiro')  renderFinanceiro();
+  if (id === 'produtos')    renderProdutos();
+  if (id === 'tempo')       renderTempo();
+  if (id === 'parados')     renderParados();
 }
 
 // ── Formatação ──────────────────────────────────────────────────────
@@ -727,17 +797,31 @@ function renderVisaoGeral(dash) {
     options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#cbd5e1' } } } },
   });
 
-  // Fluxo de caixa
-  const fluxo = BI.getFluxoCaixaPeriodo(_de, _ate);
+  // Fluxo de caixa (receita + custo diário)
+  const fluxoRaw = BI.getFluxoCaixaPeriodo(_de, _ate);
+  // Se getFluxoCaixa do FinanceiroService retornar despesas, usa; senão só receita
+  const fluxoTemDespesas = fluxoRaw.length > 0 && fluxoRaw[0].despesas !== undefined;
+  document.getElementById('sub-fluxo').textContent = fluxoTemDespesas
+    ? `Receita, Despesas e Resultado diário — ${_de} → ${_ate}`
+    : `Receita diária — ${_de} → ${_ate}`;
+  const fluxoDatasets = [
+    { label:'Receita', data: fluxoRaw.map(d => d.receitas||d.receita||0), backgroundColor:'rgba(96,165,250,.7)', borderRadius:4, order:2 },
+  ];
+  if (fluxoTemDespesas) {
+    fluxoDatasets.push(
+      { label:'Despesas', data: fluxoRaw.map(d => d.despesas||0), backgroundColor:'rgba(239,68,68,.55)', borderRadius:4, order:3 },
+      { label:'Resultado', type:'line', data: fluxoRaw.map(d => d.saldo||0),
+        borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.1)',
+        borderWidth:2, pointRadius:2, tension:.35, fill:true, order:1 }
+    );
+  }
   _chart('chart-fluxo', {
     type: 'bar',
     data: {
-      labels:   fluxo.map(d => d.data.slice(5)),
-      datasets: [
-        { label:'Receita', data: fluxo.map(d => d.receitas||0), backgroundColor:'rgba(96,165,250,.7)', borderRadius:4 },
-      ],
+      labels:   fluxoRaw.map(d => (d.data||'').slice(5)),
+      datasets: fluxoDatasets,
     },
-    options: { ...baseOpts, plugins: { ...baseOpts.plugins, legend:{ display:false } } },
+    options: { ...baseOpts },
   });
 
   // Comparativo
@@ -754,6 +838,195 @@ function renderVisaoGeral(dash) {
       <div class="compare-val">${item.atual}</div>
       <div class="compare-delta c-muted" style="font-size:.7rem">${fmtLabel(comp.anterior.periodo)}: ${item.ant}</div>
       <div class="compare-delta">${deltaHtml(item.delta, item.pct !== false)}</div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  CUSTOS — Soma de todos os custos do período
+// ═══════════════════════════════════════════════════════════════════
+function renderCustos() {
+  const BI = window.CH?.BIService;
+  if (!BI) return;
+
+  // Compatibilidade: se biService.js ainda não foi atualizado
+  if (typeof BI.getCustosConsolidados !== 'function') {
+    document.getElementById('custos-kpi-grid').innerHTML =
+      '<div class="alert alert-warning" style="grid-column:1/-1">⚠️ Atualize o arquivo <code>services/biService.js</code> para habilitar esta aba.</div>';
+    return;
+  }
+
+  const c = BI.getCustosConsolidados(_de, _ate);
+
+  // ── KPIs ────────────────────────────────────────────────────────
+  const kpis = [
+    {
+      label: 'CMV (Mercadoria)',
+      value: fmt(c.cmv),
+      sub:   fmtPct(c.pctCMV) + ' da receita',
+      classe: c.pctCMV > 65 ? 'red' : c.pctCMV > 50 ? 'yellow' : 'purple',
+    },
+    {
+      label: 'Despesas Operacionais',
+      value: fmt(c.despesas),
+      sub:   fmtPct(c.pctDespesas) + ' da receita',
+      classe: 'yellow',
+    },
+    {
+      label: 'Custo Total',
+      value: fmt(c.totalCustos),
+      sub:   fmtPct(c.pctCustoTotal) + ' da receita bruta',
+      classe: c.pctCustoTotal > 80 ? 'red' : c.pctCustoTotal > 65 ? 'yellow' : 'purple',
+    },
+    {
+      label: 'Resultado Líquido',
+      value: fmt(c.resultadoLiquido),
+      sub:   'Margem: ' + fmtPct(c.margemLiquida),
+      classe: c.resultadoLiquido >= 0 ? 'green' : 'red',
+    },
+    {
+      label: 'Receita Bruta',
+      value: fmt(c.receita),
+      sub:   'No período',
+      classe: 'blue',
+    },
+    {
+      label: 'Margem Bruta (CMV)',
+      value: fmtPct(c.margemBrutaPct),
+      sub:   'Receita − CMV',
+      classe: c.margemBrutaPct >= 40 ? 'green' : c.margemBrutaPct >= 25 ? 'yellow' : 'red',
+    },
+  ];
+  document.getElementById('custos-kpi-grid').innerHTML = kpis.map(k => `
+    <div class="kpi ${k.classe}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('');
+
+  // ── Composição dos custos (doughnut) ────────────────────────────
+  _chart('chart-custos-comp', {
+    type: 'doughnut',
+    data: {
+      labels:   ['CMV (Mercadoria)', 'Despesas Op.', 'Resultado Líquido'],
+      datasets: [{
+        data: [
+          Math.max(c.cmv, 0),
+          Math.max(c.despesas, 0),
+          Math.max(c.resultadoLiquido, 0),
+        ],
+        backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#cbd5e1' } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = c.receita || 1;
+              return ` ${fmt(ctx.raw)}  (${fmtPct(ctx.raw / total * 100)})`;
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // ── Despesas por categoria (bar horizontal) ──────────────────────
+  const semDesp = c.listaCategorias.length === 0;
+  document.getElementById('custos-sem-desp').style.display = semDesp ? 'block' : 'none';
+  document.getElementById('custos-cat-wrap').style.display = semDesp ? 'none' : 'block';
+  if (!semDesp) {
+    _chart('chart-custos-cat', {
+      type: 'bar',
+      data: {
+        labels:   c.listaCategorias.map(x => x.label),
+        datasets: [{
+          label: 'Valor (R$)',
+          data:  c.listaCategorias.map(x => x.valor),
+          backgroundColor: ['#f59e0b','#ef4444','#a78bfa','#60a5fa','#34d399','#fb923c'],
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        ...baseOpts,
+        indexAxis: 'y',
+        plugins: { ...baseOpts.plugins, legend: { display: false } },
+      },
+    });
+  }
+
+  // ── Fluxo receita × custo × resultado por dia ───────────────────
+  const fd = c.fluxoPorDia;
+  document.getElementById('sub-custos-fluxo').textContent = `${_de} → ${_ate}`;
+  _chart('chart-custos-fluxo', {
+    type: 'bar',
+    data: {
+      labels:   fd.map(d => d.data.slice(5)),
+      datasets: [
+        { label: 'Receita',    data: fd.map(d => d.receita),    backgroundColor: 'rgba(96,165,250,.65)', borderRadius: 3, order: 2 },
+        { label: 'CMV',        data: fd.map(d => d.cmv),        backgroundColor: 'rgba(239,68,68,.6)',   borderRadius: 3, order: 3 },
+        { label: 'Despesas Op',data: fd.map(d => d.despesas),   backgroundColor: 'rgba(245,158,11,.6)',  borderRadius: 3, order: 4 },
+        {
+          label: 'Resultado',
+          type: 'line',
+          data: fd.map(d => d.resultado),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,.08)',
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: .35,
+          fill: true,
+          order: 1,
+        },
+      ],
+    },
+    options: { ...baseOpts },
+  });
+
+  // ── Tabela de despesas ───────────────────────────────────────────
+  const LABEL_CAT = {
+    compra: 'Compras', avaria: 'Avarias', ajuste: 'Ajustes',
+    operacional: 'Operacional', cancelamento: 'Cancelamentos', outro: 'Outros',
+  };
+  const CAT_CLS = {
+    compra: 'chip-blue', avaria: 'chip-red', ajuste: 'chip-orange',
+    cancelamento: 'chip-red', operacional: 'chip-blue', outro: 'chip-gray',
+  };
+
+  document.getElementById('custos-desp-title').textContent =
+    `Detalhamento de Despesas Registradas — ${c.despesasLista.length} lançamento(s) · Total: ${fmt(c.despesas)}`;
+
+  document.getElementById('custos-desp-tbody').innerHTML =
+    c.despesasLista.length
+      ? c.despesasLista.map(d => `
+          <tr>
+            <td class="c-muted text-mono">${d.dataCurta || '—'}</td>
+            <td class="c-muted">${d.hora || '—'}</td>
+            <td class="fw7">${d.descricao || '—'}</td>
+            <td><span class="chip ${CAT_CLS[d.categoria] || 'chip-gray'}">${LABEL_CAT[d.categoria] || d.categoria || '—'}</span></td>
+            <td class="c-muted">${d.operador || '—'}</td>
+            <td class="text-right c-red fw7">${fmt(d.valor)}</td>
+          </tr>
+        `).join('')
+      : '<tr><td colspan="6" class="empty-state">Nenhuma despesa registrada no período. 🎉</td></tr>';
+
+  // ── Resumo consolidado ───────────────────────────────────────────
+  const resumoItens = [
+    { label: '(+) Receita Bruta',          value: fmt(c.receita),         cls: 'c-text' },
+    { label: '(−) CMV',                     value: '− ' + fmt(c.cmv),      cls: 'c-red' },
+    { label: '= Margem Bruta',              value: fmt(c.margemBruta),     cls: c.margemBruta >= 0 ? 'c-green' : 'c-red', bold: true },
+    { label: '(−) Despesas Operacionais',   value: '− ' + fmt(c.despesas), cls: 'c-red' },
+    { label: '= Resultado Líquido',         value: fmt(c.resultadoLiquido),cls: c.resultadoLiquido >= 0 ? 'c-green' : 'c-red', bold: true, big: true },
+  ];
+  document.getElementById('custos-resumo-grid').innerHTML = resumoItens.map(r => `
+    <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px;${r.big?'border:1px solid var(--border)':''}">
+      <div style="font-size:.7rem;color:var(--muted);margin-bottom:4px">${r.label}</div>
+      <div class="${r.cls}" style="font-size:${r.big?'1.15':'1'}rem;font-weight:${r.bold?'800':'600'}">${r.value}</div>
     </div>
   `).join('');
 }
@@ -965,11 +1238,12 @@ function renderAll() {
 
   // Render da tab ativa
   const tabAtiva = document.querySelector('.tab-content.active')?.id?.replace('tab-','');
-  if (tabAtiva === 'abc')        renderABC();
-  if (tabAtiva === 'financeiro') renderFinanceiro();
-  if (tabAtiva === 'produtos')   renderProdutos();
-  if (tabAtiva === 'tempo')      renderTempo();
-  if (tabAtiva === 'parados')    renderParados();
+  if (tabAtiva === 'custos')      renderCustos();
+  if (tabAtiva === 'abc')         renderABC();
+  if (tabAtiva === 'financeiro')  renderFinanceiro();
+  if (tabAtiva === 'produtos')    renderProdutos();
+  if (tabAtiva === 'tempo')       renderTempo();
+  if (tabAtiva === 'parados')     renderParados();
 
   document.getElementById('last-update').textContent =
     'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
