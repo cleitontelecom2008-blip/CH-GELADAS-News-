@@ -21,7 +21,9 @@
 
   let _processing     = false;
   let _timer          = null;
-  let _firebaseReady  = false; // guard para evitar re-entrada via firebase:ready
+  // NOTA: _firebaseReady removido — o guard permanente bloqueava reconexões
+  // após queda e retomada do Firebase (token renewal, rede instável).
+  // A proteção contra re-entrada simultânea é feita pelo flag _processing.
 
   // ── Persistência da fila ─────────────────────────────────────────
   function _loadQueue() {
@@ -99,7 +101,6 @@
 
     const fbOk = await FirebaseService.init();
     if (!fbOk) {
-      console.info('[SyncQueue] Firebase não disponível — reagendando em 15s.');
       _scheduleProcess(15_000);
       return;
     }
@@ -147,7 +148,6 @@
         return;
       }
 
-      console.info(`[SyncQueue] Processando ${pendentes.length} item(ns)...`);
 
       for (const item of pendentes) {
         item.status = 'processando';
@@ -159,7 +159,6 @@
           item.ultimoErro = null;
           EventBus.emit('sync:ok', item.colecao);
           EventBus.emit(`sync:ok:${item.colecao}`);
-          console.info(`[SyncQueue] ✓ ${item.colecao} (${item.acao})`);
         } catch(e) {
           item.tentativas++;
           item.ultimoErro       = e.message || String(e);
@@ -226,7 +225,6 @@
     });
     _saveQueue(q);
     if (count > 0) {
-      console.info(`[SyncQueue] ${count} item(ns) de erro reenviados para fila.`);
       _scheduleProcess(500);
     }
     return count;
@@ -235,7 +233,6 @@
   function limparFila() {
     _saveQueue([]);
     UIService_setDot(true);
-    console.info('[SyncQueue] Fila limpa.');
   }
 
   // ── Integração com pending sync do core.js ──────────────────────
@@ -263,7 +260,6 @@
     });
     if (changed) {
       _saveQueue(q);
-      console.info('[SyncQueue] Itens "processando" resetados para "pendente" após reload.');
     }
   }
 
@@ -273,17 +269,13 @@
 
   // ── Eventos ──────────────────────────────────────────────────────
   window.addEventListener('online', () => {
-    console.info('[SyncQueue] Online — processando fila pendente...');
     UIService_setDot(false, 'Sincronizando...');
     processar();
   });
 
-  // FIX: guard _firebaseReady evita processar() re-entrante quando
-  // firebase:ready é emitido de dentro de FirebaseService.init() chamado
-  // pelo próprio processar() — causava duas instâncias concorrentes.
+  // firebase:ready pode ser emitido mais de uma vez (reconexão, token renewal).
+  // Sem guard permanente — _processing já protege contra execuções simultâneas.
   EventBus.on('firebase:ready', () => {
-    if (_firebaseReady) return;
-    _firebaseReady = true;
     _drainPendingSync();
     processar();
   });
@@ -308,5 +300,4 @@
     limparFila,
   };
 
-  console.info('%c SyncQueue ✓ v2', 'color:#10b981');
 })();

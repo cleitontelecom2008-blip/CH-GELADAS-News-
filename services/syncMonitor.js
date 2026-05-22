@@ -207,5 +207,4 @@
     setEstado:    _setEstado,
   };
 
-  console.info('%c SyncMonitor ✓  (global — todas as páginas)', 'color:#10b981');
 })();

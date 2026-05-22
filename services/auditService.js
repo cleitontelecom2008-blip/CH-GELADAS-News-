@@ -195,5 +195,4 @@
     exportarCSV,
   };
 
-  console.info('%c AuditService ✓', 'color:#10b981');
 })();

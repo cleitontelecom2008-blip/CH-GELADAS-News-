@@ -51,9 +51,8 @@
       });
     }
 
-    // Financeiro — registrado automaticamente pelo FinanceiroService
-    // via EventBus.on('venda:finalizada') — NÃO chamar diretamente aqui
-    // para evitar duplo lançamento no Store.getFinanceiro().
+    // Financeiro — registrarReceita é acionado via EventBus.on('venda:finalizada')
+    // em financeiroService.js. NÃO chamar diretamente aqui para evitar registro duplo.
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -98,9 +97,6 @@
       _troco:           extras.troco           || 0,
       _parcelaDinheiro: extras.parcelaDinheiro || 0,
       _parcelaRestante: extras.parcelaRestante || 0,
-      // ── Contexto multi-filial / SaaS ───────────────────────────
-      filialId:   window.CH?.FilialService?.getFilialId?.()   || 'principal',
-      empresaId:  window.CH?.SaasService?.getEmpresaId?.()    || null,
       _formaRestante:   extras.formaRestante   || '',
     };
 
@@ -117,8 +113,15 @@
 
     // ── REQUER APROVAÇÃO: para aqui, sem estoque/financeiro ──────
     if (requerAprovacao) {
+      // Reserva o estoque para evitar o "Paradoxo do Estoque":
+      // impede que outro colaborador venda as mesmas unidades
+      // enquanto esta venda aguarda aprovação/validação.
+      const ES = window.CH.EstoqueService;
+      if (ES?.reservarEstoque) {
+        try { ES.reservarEstoque(venda.id, venda.itens || []); }
+        catch(e) { console.warn('[VendasService] Reserva de estoque falhou:', e.message); }
+      }
       EventBus.emit('venda:pendente', venda);
-      console.info(`[VendasService] Venda PENDENTE (${role}) → ${venda.id} | aguarda controlador`);
       return venda; // ← retorna objeto real, não Promise
     }
 
@@ -155,10 +158,8 @@
       }
     });
 
-    if (['concluida', 'validada'].includes(venda.status)) {
-      const FinanceiroService = window.CH.FinanceiroService;
-      if (FinanceiroService) FinanceiroService.registrarEstorno(venda);
-    }
+    // Financeiro — registrarEstorno é acionado via EventBus.on('venda:cancelada')
+    // em financeiroService.js. NÃO chamar diretamente aqui para evitar estorno duplo.
 
     if (window.CH.SyncQueue) {
       const v = Store.getVendas().find(v => v.id === vendaId);
@@ -241,5 +242,4 @@
     getProdutosMaisVendidos,
   };
 
-  console.info('%c VendasService ✓  (síncrono | aprovação via PermissoesService)', 'color:#10b981;font-weight:bold');
 })();

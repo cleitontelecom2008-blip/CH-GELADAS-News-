@@ -39,19 +39,104 @@
   function _usuario()   { return AuthService.getNome(); }
   function _isOnline()  { return navigator.onLine; }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  RESERVA DE ESTOQUE — Previne o "Paradoxo do Estoque"
+  //
+  //  Quando uma venda vai para status "pendente" o estoque físico
+  //  ainda não é baixado. Sem reserva, dois colaboradores poderiam
+  //  vender o mesmo item até o limite total, causando furo no
+  //  inventário ao validar. A reserva soft-bloqueia as unidades
+  //  enquanto a venda aguarda aprovação/validação.
+  //
+  //  Estrutura em localStorage (CH_RESERVAS_ESTOQUE):
+  //    { [vendaId]: { [prodId]: qtdUnidadesReservadas, ... }, ... }
+  // ══════════════════════════════════════════════════════════════════
+
+  const _RESERVAS_KEY = 'CH_RESERVAS_ESTOQUE';
+
+  function _getReservas() {
+    try { return JSON.parse(localStorage.getItem(_RESERVAS_KEY) || '{}'); } catch { return {}; }
+  }
+
+  function _setReservas(r) {
+    try { localStorage.setItem(_RESERVAS_KEY, JSON.stringify(r)); } catch(_) {}
+  }
+
+  /**
+   * Reserva unidades de estoque para uma venda pendente.
+   * Deve ser chamado quando a venda entra em status "pendente".
+   * É idempotente: sobrescreve a reserva anterior para o mesmo vendaId.
+   */
+  function reservarEstoque(vendaId, itens) {
+    if (!vendaId || !itens?.length) return;
+    const reservas = _getReservas();
+    reservas[vendaId] = {};
+    for (const item of itens) {
+      const prod = getProduto(item.prodId);
+      if (!prod) continue;
+      const pack  = prod.packs?.find(pk => pk.label === item.label || (pk.qtd + 'x') === item.label);
+      const qtdUn = item.label === 'UNID' ? item.qtd : item.qtd * (pack?.qtd || 1);
+      reservas[vendaId][item.prodId] = (reservas[vendaId][item.prodId] || 0) + qtdUn;
+    }
+    _setReservas(reservas);
+    EventBus.emit('estoque:reserva_atualizada', { vendaId });
+  }
+
+  /**
+   * Libera a reserva de uma venda (rejeição ou validação efetiva).
+   * Após chamar este método, as unidades voltam ao estoque disponível.
+   */
+  function liberarReserva(vendaId) {
+    if (!vendaId) return;
+    const reservas = _getReservas();
+    if (!reservas[vendaId]) return; // já liberada
+    delete reservas[vendaId];
+    _setReservas(reservas);
+    EventBus.emit('estoque:reserva_atualizada', { vendaId });
+  }
+
+  /**
+   * Retorna o total de unidades reservadas para um produto
+   * (soma de todas as vendas pendentes que o incluem).
+   */
+  function getQtdReservada(prodId) {
+    const reservas = _getReservas();
+    return Object.values(reservas).reduce((s, r) => s + (r[prodId] || 0), 0);
+  }
+
+  /**
+   * Retorna o estoque disponível descontando reservas de vendas pendentes.
+   * Use este valor no PDV e na tela de aprovação para exibir quantidade real.
+   */
+  function getEstoqueDisponivel(prodId) {
+    const prod = getProduto(prodId);
+    if (!prod) return 0;
+    const atual     = prod.estoqueAtual ?? prod.qtdUn ?? 0;
+    const reservado = getQtdReservada(prodId);
+    return Math.max(0, atual - reservado);
+  }
+
+  /** Retorna o mapa completo de reservas (para diagnóstico). */
+  function getReservas() { return _getReservas(); }
+
   // Alias de campos legados → modelo novo (retrocompat)
   function _normalizarProduto(p) {
+    const estoqueAtual  = p.estoqueAtual ?? p.qtdUn ?? 0;
+    const qtdReservada  = getQtdReservada(p.id);
     return {
       ...p,
-      precoVenda:     p.precoVenda  ?? p.precoUn  ?? 0,
-      precoCusto:     p.precoCusto  ?? p.custoUn  ?? 0,
-      estoqueAtual:   p.estoqueAtual ?? p.qtdUn   ?? 0,
-      estoqueMinimo:  p.estoqueMinimo ?? 0,
-      qtdUn:          p.qtdUn       ?? p.estoqueAtual ?? 0,  // compat
-      precoUn:        p.precoUn     ?? p.precoVenda   ?? 0,  // compat
-      custoUn:        p.custoUn     ?? p.precoCusto   ?? 0,  // compat
-      ativo:          p.ativo       ?? true,
-      unidade:        p.unidade     ?? 'UN',
+      precoVenda:         p.precoVenda  ?? p.precoUn  ?? 0,
+      precoCusto:         p.precoCusto  ?? p.custoUn  ?? 0,
+      estoqueAtual,
+      estoqueMinimo:      p.estoqueMinimo ?? 0,
+      qtdUn:              p.qtdUn       ?? estoqueAtual,       // compat
+      precoUn:            p.precoUn     ?? p.precoVenda ?? 0,  // compat
+      custoUn:            p.custoUn     ?? p.precoCusto ?? 0,  // compat
+      ativo:              p.ativo       ?? true,
+      unidade:            p.unidade     ?? 'UN',
+      // ── Reserva de estoque ────────────────────────────────────
+      qtdReservada,
+      estoqueDisponivel:  Math.max(0, estoqueAtual - qtdReservada),
     };
   }
 
@@ -239,7 +324,6 @@
           });
         });
 
-        console.info(`[Estoque] ✓ Transação ${tipo}: ${prod.nome} (${estoqueAntes}→${estoqueDepois})`);
 
         // Atualiza Store local com o valor calculado
         Store.mutateEstoque(estoque => {
@@ -262,7 +346,6 @@
       // ── Modo local: offline, sem adminToken (PDV), ou Firebase não pronto ──
       // Aplica localmente — SyncQueue garante que admin sincronize depois.
       const motivo = !_isOnline() ? 'offline' : 'Firebase não pronto';
-      console.info(`[Estoque] Modo local (${motivo}): ${tipo} ${prod.nome}`);
       _movimentacaoLocal({ produtoId, prod, tipo, delta, estoqueAntes, estoqueDepois, origem, operador, observacao, custo, fornecedorId });
     }
 
@@ -288,17 +371,6 @@
 
     window.CH.AuditService?.auditarMovimentacao(mov);
     EventBus.emit('estoque:movimentado', mov);
-
-    // ── Alertas de estoque pós-movimentação ──────────────────────────
-    if (delta < 0) {
-      const thr = Store.getConfig()?.alertaEstoque ?? 3;
-      if (estoqueDepois <= 0) {
-        EventBus.emit('estoque:ruptura', { produtoId, nome: prod.nome, qtd: 0 });
-      } else if (estoqueDepois <= (prod.estoqueMinimo || thr)) {
-        EventBus.emit('estoque:baixo', { produtoId, nome: prod.nome, qtd: estoqueDepois });
-      }
-    }
-
     return mov;
   }
 
@@ -312,7 +384,6 @@
         p.updatedAt    = Utils.nowISO();
       }
     });
-    console.info(`[Estoque] Movimentação local (offline): ${origem}`);
   }
 
   // ── APIs de alto nível ───────────────────────────────────────────
@@ -480,6 +551,13 @@
     getMovimentacoes,
     getMovimentacoesHoje,
 
+    // Reserva de Estoque (anti-paradoxo)
+    reservarEstoque,
+    liberarReserva,
+    getQtdReservada,
+    getEstoqueDisponivel,
+    getReservas,
+
     // Alertas
     getProdutosAbaixoMinimo,
     getProdutosSemEstoque,
@@ -497,5 +575,4 @@
     atualizarFornecedor,
   };
 
-  console.info('%c EstoqueService ✓  (Transactions + Movimentações)', 'color:#10b981');
 })();

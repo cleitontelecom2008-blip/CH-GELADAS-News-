@@ -80,7 +80,6 @@
       const fb = window.CH?.FirebaseService;
       if (!fb?.isReady) return;
       await fb.salvar('usuarios', users);
-      console.info('[UserService] Usuarios sincronizados no Firestore.');
     } catch(e) {
       console.warn('[UserService] Push Firebase falhou:', e.message);
     }
@@ -98,7 +97,6 @@
         if (!merged.find(r => r.id === u.id)) merged.push(u);
       }
       _saveUsers(merged);
-      console.info('[UserService] ' + merged.length + ' usuario(s) carregado(s) do Firestore.');
     } catch(e) {
       console.warn('[UserService] syncUsers falhou:', e.message);
     }
@@ -274,5 +272,4 @@
 
   EventBus.on('firebase:ready', () => { syncUsers().catch(() => {}); });
 
-  console.info('%c UserService OK (nome+senha | Firestore sync)', 'color:#10b981');
 })();

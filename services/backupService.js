@@ -102,6 +102,10 @@
 
       const batch = FirebaseService.getBatch();
 
+      // adminToken é obrigatório pela regra do Firestore para backups
+      const _tok = FirebaseService.getAdminToken();
+      if (_tok) meta.adminToken = _tok;
+
       // Metadados do snapshot
       batch.set(ref, meta);
 
@@ -116,10 +120,11 @@
       const smallData = {};
       colsPequenas.forEach(k => { smallData[k] = dados[k]; });
       smallData.config = dados.config;
-      batch.set(smallRef, { dados: smallData, ts: dados.geradoEm });
+      const smallDoc = { dados: smallData, ts: dados.geradoEm };
+      if (_tok) smallDoc.adminToken = _tok;
+      batch.set(smallRef, smallDoc);
 
       await batch.commit();
-      console.info('[Backup] ✓ Salvo no Firestore:', Utils.todayISO());
       return true;
     } catch(e) {
       console.warn('[Backup] Firestore falhou:', e.message);
@@ -158,11 +163,9 @@
    */
   async function fazerBackup(forcarDownload = false) {
     if (!AuthService.isAdmin()) {
-      console.info('[Backup] Apenas admin pode fazer backup.');
       return null;
     }
 
-    console.info('[Backup] Iniciando...');
     const dados = _coletarDados();
 
     // 1. Firestore (assíncrono, não bloqueia)
@@ -193,21 +196,15 @@
       },
     });
 
-    console.info(`[Backup] ✓ Concluído — Firestore: ${fbOk ? 'sim' : 'não'}`);
     return dados;
   }
 
   // ── Backup automático diário ──────────────────────────────────────
   async function _verificarBackupDiario() {
     if (!AuthService.isAdmin()) return;
-    if (_fezHoje()) {
-      console.info('[Backup] Já feito hoje:', _getMeta().lastBackup?.slice(0,10));
-      return;
-    }
-
-    // Aguarda Firebase estar pronto
-    const ok = await FirebaseService.init().catch(() => false);
-    await fazerBackup(false); // sem download automático
+    if (_fezHoje()) return;
+    await FirebaseService.init().catch(() => false);
+    await fazerBackup(false);
   }
 
   // ── Agendar verificação ───────────────────────────────────────────
@@ -260,5 +257,4 @@
     fezHoje: _fezHoje,
   };
 
-  console.info('%c BackupService ✓  (auto-diário + Firestore + JSON)', 'color:#10b981');
 })();

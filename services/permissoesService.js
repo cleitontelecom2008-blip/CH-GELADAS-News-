@@ -24,6 +24,7 @@
     { id: 'estoque',             label: 'Estoque',               icone: '📦', cor: '#10b981' },
     { id: 'financeiro',          label: 'Financeiro',            icone: '📊', cor: '#8b5cf6' },
     { id: 'fiado',               label: 'Fiado',                 icone: '🤝', cor: '#ef4444' },
+    { id: 'cambio',              label: 'Câmbio',                icone: '💱', cor: '#f59e0b' },
     { id: 'comandas',            label: 'Comandas',              icone: '🍽️', cor: '#ec4899' },
     { id: 'delivery',            label: 'Delivery',              icone: '🛵', cor: '#f97316' },
     { id: 'ponto',               label: 'Ponto',                 icone: '⏱️', cor: '#14b8a6' },
@@ -42,32 +43,32 @@
   const PERFIS_PADRAO = {
     colaborador: {
       label: 'Colaborador', cor: '#3b82f6', icone: '🛒',
-      modulos: { vendas:2, estoque:0, financeiro:0, fiado:0, comandas:0, delivery:0, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:0, relatorios:0 },
+      modulos: { vendas:2, estoque:0, financeiro:0, fiado:0, cambio:0, comandas:0, delivery:0, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:0, relatorios:0 },
       flags: { vendas_requer_aprovacao: true },
     },
     controlador: {
       label: 'Controlador', cor: '#f59e0b', icone: '🔍',
-      modulos: { vendas:1, estoque:0, financeiro:0, fiado:0, comandas:0, delivery:0, ponto:1, cardapio:0, aprovacao_controle:2, aprovacao_validacao:0, relatorios:1 },
+      modulos: { vendas:1, estoque:0, financeiro:0, fiado:0, cambio:0, comandas:0, delivery:0, ponto:1, cardapio:0, aprovacao_controle:2, aprovacao_validacao:0, relatorios:1 },
       flags: { vendas_requer_aprovacao: false },
     },
     validador: {
       label: 'Validador', cor: '#8b5cf6', icone: '✅',
-      modulos: { vendas:1, estoque:1, financeiro:1, fiado:0, comandas:0, delivery:0, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:2, relatorios:1 },
+      modulos: { vendas:1, estoque:1, financeiro:1, fiado:0, cambio:0, comandas:0, delivery:0, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:2, relatorios:1 },
       flags: { vendas_requer_aprovacao: false },
     },
     gerente: {
       label: 'Gerente', cor: '#f59e0b', icone: '📊',
-      modulos: { vendas:2, estoque:2, financeiro:2, fiado:2, comandas:2, delivery:2, ponto:2, cardapio:1, aprovacao_controle:0, aprovacao_validacao:0, relatorios:2 },
+      modulos: { vendas:2, estoque:2, financeiro:2, fiado:2, cambio:2, comandas:2, delivery:2, ponto:2, cardapio:1, aprovacao_controle:0, aprovacao_validacao:0, relatorios:2 },
       flags: { vendas_requer_aprovacao: false },
     },
     operador: {
       label: 'Operador', cor: '#10b981', icone: '🖥️',
-      modulos: { vendas:2, estoque:1, financeiro:0, fiado:0, comandas:2, delivery:2, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:0, relatorios:0 },
+      modulos: { vendas:2, estoque:1, financeiro:0, fiado:0, cambio:0, comandas:2, delivery:2, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:0, relatorios:0 },
       flags: { vendas_requer_aprovacao: false },
     },
     entregador: {
       label: 'Entregador', cor: '#06b6d4', icone: '🚴',
-      modulos: { vendas:0, estoque:0, financeiro:0, fiado:0, comandas:0, delivery:2, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:0, relatorios:0 },
+      modulos: { vendas:0, estoque:0, financeiro:0, fiado:0, cambio:0, comandas:0, delivery:2, ponto:1, cardapio:0, aprovacao_controle:0, aprovacao_validacao:0, relatorios:0 },
       flags: { vendas_requer_aprovacao: false },
     },
   };
@@ -86,6 +87,25 @@
 
   function _save(perfis) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(perfis)); } catch(e) {}
+    // Sobe para Firestore imediatamente para todos os devices receberem
+    try {
+      if (window.CH?.SyncQueue) {
+        window.CH.SyncQueue.enqueue('salvar', 'perfis', perfis);
+      }
+    } catch(_) {}
+  }
+
+  function _pullPerfis() {
+    // Baixa perfis do Firestore se disponível (para receber mudanças do ADM)
+    try {
+      const fb = window.CH?.FirebaseService;
+      if (!fb) return;
+      fb.ler('perfis').then(dados => {
+        if (!dados) return;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(dados)); } catch(_) {}
+        if (window.CH?.EventBus) window.CH.EventBus.emit('perfis:atualizados', dados);
+      }).catch(() => {});
+    } catch(_) {}
   }
 
   function _inicializar() {
@@ -132,26 +152,26 @@
 
     if (changed) {
       _save(merged);
-      console.info('[PermissoesService] Migração de perfis aplicada.');
     }
   }
 
   // ── Leitura ───────────────────────────────────────────────────────
 
-  /** Retorna todos os perfis como array [{id, label, cor, icone, modulos, flags}] */
-  function getPerfis() {
+  function _getPerfisCached() {
     _inicializar();
-    const raw = _load();
+    return _load();
+  }
+
+  function getPerfis() {
+    const raw = _getPerfisCached();
     return Object.entries(raw).map(([id, p]) => ({ id, ...p }));
   }
 
-  /** Retorna um perfil pelo id */
   function getPerfil(roleId) {
     if (['adm', 'admin'].includes(roleId)) {
       return { id: roleId, label: 'Administrador', cor: '#ef4444', icone: '👑', modulos: ADM_MODULOS, flags: {} };
     }
-    _inicializar();
-    const raw = _load();
+    const raw = _getPerfisCached();
     return raw[roleId] ? { id: roleId, ...raw[roleId] } : null;
   }
 
@@ -198,12 +218,10 @@
 
   // ── CRUD de perfis ────────────────────────────────────────────────
 
-  /** Cria um novo perfil personalizado */
   function criarPerfil({ id, label, cor, icone, modulos, flags }) {
     if (!id || !label) throw new Error('id e label são obrigatórios');
     if (['adm','admin'].includes(id)) throw new Error('id reservado');
-    _inicializar();
-    const raw = _load();
+    const raw = _getPerfisCached();
     if (raw[id]) throw new Error(`Perfil "${id}" já existe`);
 
     const modulosCompletos = {};
@@ -216,22 +234,18 @@
     return { id, ...raw[id] };
   }
 
-  /** Atualiza um perfil existente */
   function atualizarPerfil(id, dados) {
     if (['adm','admin'].includes(id)) throw new Error('Perfil ADM não pode ser editado');
-    _inicializar();
-    const raw = _load();
+    const raw = _getPerfisCached();
     if (!raw[id]) throw new Error(`Perfil "${id}" não encontrado`);
     Object.assign(raw[id], dados);
     _save(raw);
     return { id, ...raw[id] };
   }
 
-  /** Remove um perfil (não pode remover se houver usuários ativos com ele) */
   function deletarPerfil(id) {
     if (['adm','admin'].includes(id)) throw new Error('Perfil ADM não pode ser removido');
-    _inicializar();
-    const raw = _load();
+    const raw = _getPerfisCached();
     if (!raw[id]) throw new Error(`Perfil "${id}" não encontrado`);
     delete raw[id];
     _save(raw);
@@ -258,7 +272,10 @@
     atualizarPerfil,
     deletarPerfil,
     restaurarPadroes,
+    pullPerfis: _pullPerfis,
   };
 
-  console.info('%c PermissoesService ✓  (perfis dinâmicos por módulo)', 'color:#f59e0b');
+  // Pull automático no boot para garantir que este device tenha os perfis mais recentes
+  setTimeout(_pullPerfis, 1200);
+
 })();
