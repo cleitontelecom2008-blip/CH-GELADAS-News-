@@ -270,7 +270,9 @@
     // Nesse caso, aplica localmente e SyncQueue envia quando admin sincronizar.
     if (_isOnline() && FirebaseService.isReady()) {
       try {
-        await FirebaseService.runTransaction(async (tx) => {
+        const _txTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('transaction_timeout')), 10000));
+        await Promise.race([
+          FirebaseService.runTransaction(async (tx) => {
           // Lê o documento de estoque no Firestore
           const estoqueRef = FirebaseService.docRef('ch_dados', 'estoque');
           const snap = await tx.get(estoqueRef);
@@ -334,6 +336,9 @@
             p.updatedAt = Utils.nowISO();
           }
         });
+        }),
+          _txTimeout,
+        ]);
 
       } catch (e) {
         // Se for erro de validação (estoque insuficiente), propaga

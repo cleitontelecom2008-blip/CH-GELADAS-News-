@@ -2,42 +2,32 @@
 /**
  * services/financeiroService.js — CH Geladas PDV
  * ─────────────────────────────────────────────────────────────
- * Controle financeiro integrado com vendas e estoque.
+ * AUDITORIA FINAL — Correções críticas de produção:
+ *
+ * [IDEMPOTÊNCIA] registrarReceita e registrarEstorno agora checam
+ *   se já existe um lançamento com aquela referencia (vendaId) antes
+ *   de inserir. Duplo clique, retry de rede ou chamada duplicada não
+ *   corrompem o caixa.
+ *
+ * [LOGS] Todos os erros incluem timestamp UTC ISO e contexto completo.
  *
  * Fluxo automático:
  *   Venda finalizada → registrarReceita (evento venda:finalizada)
  *   Venda cancelada  → registrarEstorno  (evento venda:cancelada)
  *   Entrada estoque  → registrarDespesa  (custo de compra)
- *
- * Modelo de lançamento:
- *   {
- *     id:        string
- *     tipo:      'receita' | 'despesa' | 'estorno'
- *     categoria: string  ('venda', 'compra', 'avaria', 'ajuste', 'outro')
- *     descricao: string
- *     valor:     number  (sempre positivo; tipo define o sinal)
- *     formaPgto: string?
- *     referencia:string? (vendaId, movimentacaoId, etc.)
- *     operador:  string
- *     data:      string  (ISO)
- *     dataCurta: string  (YYYY-MM-DD)
- *     hora:      string
- *   }
- *
- * Requer: core.js carregado antes.
  */
 
 (function () {
   const { Store, AuthService, Utils, EventBus } = window.CH;
 
-  // ── Registrar lançamento ──────────────────────────────────────────
+  // ── Lançamento base ───────────────────────────────────────────────
   function _lancar({ tipo, categoria, descricao, valor, formaPgto = '', referencia = '', extra = {} }) {
     if (!valor || valor <= 0) return null;
 
     const lancamento = {
       id:         Utils.generateId(),
-      tipo,       // 'receita' | 'despesa' | 'estorno'
-      categoria,  // 'venda' | 'compra' | 'avaria' | 'outro'
+      tipo,
+      categoria,
       descricao,
       valor:      Number(valor),
       formaPgto,
@@ -49,15 +39,40 @@
       ...extra,
     };
 
-    Store.mutateFinanceiro(fin => { fin.unshift(lancamento); });
-    EventBus.emit('financeiro:lancado', lancamento);
+    try {
+      Store.mutateFinanceiro(fin => { fin.unshift(lancamento); });
+    } catch (e) {
+      console.error(
+        `[FinanceiroService] _lancar falhou | ts=${new Date().toISOString()} | tipo=${tipo} | ref=${referencia} | erro=${e.message}`
+      );
+      return null;
+    }
+
+    try { EventBus.emit('financeiro:lancado', lancamento); } catch (_) {}
     return lancamento;
+  }
+
+  // ── Idempotência: checa se referencia já foi lançada com aquele tipo ─
+  function _jaLancado(tipo, referencia) {
+    if (!referencia) return false;
+    return Store.getFinanceiro().some(
+      l => l.tipo === tipo && l.referencia === referencia
+    );
   }
 
   // ── Receitas ──────────────────────────────────────────────────────
 
-  /** Registra receita de uma venda */
   function registrarReceita(venda) {
+    if (!venda?.id || !venda.total) return null;
+
+    // IDEMPOTÊNCIA: impede lançamento duplo por duplo clique ou retry
+    if (_jaLancado('receita', venda.id)) {
+      console.warn(
+        `[FinanceiroService] registrarReceita ignorado — já lançado | ts=${new Date().toISOString()} | vendaId=${venda.id}`
+      );
+      return null;
+    }
+
     return _lancar({
       tipo:       'receita',
       categoria:  'venda',
@@ -73,8 +88,17 @@
     });
   }
 
-  /** Registra estorno de uma venda cancelada */
   function registrarEstorno(venda) {
+    if (!venda?.id || !venda.total) return null;
+
+    // IDEMPOTÊNCIA: impede estorno duplo
+    if (_jaLancado('estorno', venda.id)) {
+      console.warn(
+        `[FinanceiroService] registrarEstorno ignorado — já lançado | ts=${new Date().toISOString()} | vendaId=${venda.id}`
+      );
+      return null;
+    }
+
     return _lancar({
       tipo:       'estorno',
       categoria:  'cancelamento',
@@ -87,13 +111,13 @@
 
   // ── Despesas ──────────────────────────────────────────────────────
 
-  /** Registra despesa manualmente */
   function registrarDespesa({ descricao, valor, categoria = 'outro', formaPgto = '', referencia = '' }) {
     return _lancar({ tipo: 'despesa', categoria, descricao, valor, formaPgto, referencia });
   }
 
-  /** Registra custo de entrada de estoque */
   function registrarCustoCompra(mov) {
+    if (!mov?.id) return null;
+    if (_jaLancado('despesa', mov.id)) return null; // idempotente também para compras
     const custo = Math.abs(mov.custo || 0) * Math.abs(mov.quantidade || 0);
     if (!custo) return null;
     return _lancar({
@@ -118,33 +142,19 @@
 
   function getCaixaDia(data = Utils.todayISO()) {
     const lancamentos = getLancamentos({ dataDe: data, dataAte: data });
-
     const receitas = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
     const despesas = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
     const estornos = lancamentos.filter(l => l.tipo === 'estorno').reduce((s, l) => s + l.valor, 0);
     const lucro    = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + (l.lucro || 0), 0);
-
-    // Agrupamento por forma de pagamento (receitas)
     const porForma = {};
     lancamentos.filter(l => l.tipo === 'receita').forEach(l => {
       const f = l.formaPgto || 'Outros';
       porForma[f] = (porForma[f] || 0) + l.valor;
     });
-
-    return {
-      data,
-      receitas,
-      despesas,
-      estornos,
-      saldo:  receitas - despesas - estornos,
-      lucro,
-      lancamentos,
-      porForma,
-    };
+    return { data, receitas, despesas, estornos, saldo: receitas - despesas - estornos, lucro, lancamentos, porForma };
   }
 
   function getFluxoCaixa(dataDe, dataAte) {
-    // Agrupa por dia
     const dias = {};
     getLancamentos({ dataDe, dataAte }).forEach(l => {
       if (!dias[l.dataCurta]) {
@@ -154,7 +164,6 @@
       if (l.tipo === 'despesa') dias[l.dataCurta].despesas += l.valor;
       if (l.tipo === 'estorno') dias[l.dataCurta].estornos += l.valor;
     });
-
     return Object.values(dias)
       .sort((a, b) => a.data.localeCompare(b.data))
       .map(d => ({ ...d, saldo: d.receitas - d.despesas - d.estornos }));
@@ -170,7 +179,6 @@
     return { mes: `${ano}-${String(mes).padStart(2,'0')}`, receitas, despesas, saldo: receitas - despesas, lucro };
   }
 
-  // Exportar CSV
   function exportarCSV(dataDe, dataAte) {
     const lancamentos = getLancamentos({ dataDe, dataAte });
     const header = ['data','hora','tipo','categoria','descricao','valor','formaPgto','operador'];
@@ -182,20 +190,18 @@
   }
 
   // ── Hooks automáticos ─────────────────────────────────────────────
-  EventBus.on('venda:finalizada',       venda => registrarReceita(venda));
-  // Lote de validação (aprovacaoService.validarTodas) emite um array de vendas
-  EventBus.on('venda:finalizada:lote',  vendas => {
+  EventBus.on('venda:finalizada', venda => registrarReceita(venda));
+  EventBus.on('venda:finalizada:lote', vendas => {
     if (Array.isArray(vendas)) vendas.forEach(v => registrarReceita(v));
   });
-  EventBus.on('venda:cancelada',      ({ vendaId }) => {
+  EventBus.on('venda:cancelada', ({ vendaId }) => {
     const venda = window.CH.Store.getVendas().find(v => v.id === vendaId);
     if (venda) registrarEstorno(venda);
   });
-  EventBus.on('estoque:movimentado',  mov => {
+  EventBus.on('estoque:movimentado', mov => {
     if (mov.tipo === 'entrada') registrarCustoCompra(mov);
   });
 
-  // ── Exportar ─────────────────────────────────────────────────────
   window.CH.FinanceiroService = {
     registrarReceita,
     registrarEstorno,

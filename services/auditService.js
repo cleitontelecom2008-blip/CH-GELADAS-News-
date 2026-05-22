@@ -63,11 +63,14 @@
       ...extra,
     };
 
-    Store.mutateAuditoria(audit => {
-      audit.unshift(reg);
-    });
+    try {
+      Store.mutateAuditoria(audit => { audit.unshift(reg); });
+    } catch(e) {
+      console.warn('[AuditService] Falha ao registrar auditoria:', e.message);
+      return null;
+    }
 
-    EventBus.emit('auditoria:registrada', reg);
+    try { EventBus.emit('auditoria:registrada', reg); } catch(_) {}
     return reg;
   }
 
