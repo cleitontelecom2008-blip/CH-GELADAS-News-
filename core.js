@@ -552,12 +552,12 @@ const Store = (() => {
 
 const FirebaseService = (() => {
   const CONFIG = {
-  apiKey:            'AIzaSyDdFvTRQQmomMiLD0byrBwGZnitSC0zwus',
+  apiKey:            'AIzaSyCPq8-B4l-kThTXtX9CVBTdpzarBObUYxI',
   authDomain:        'ch-geladas.firebaseapp.com',
   projectId:         'ch-geladas',
   storageBucket:     'ch-geladas.firebasestorage.app',
-  messagingSenderId: '898297448757',
-  appId:             '1:898297448757:web:d59cb5336d61d19ad9a47c',
+  messagingSenderId: '859746983655',
+  appId:             '1:859746983655:web:dce025d5048850923a8c42',
   measurementId:     'G-QYJRW9YEPW',
   };
 
