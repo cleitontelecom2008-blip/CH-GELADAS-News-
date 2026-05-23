@@ -104,8 +104,11 @@ const CONSTANTS = Object.freeze({
 });
 
 const Utils = Object.freeze({
-  _fmt: new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL', minimumFractionDigits:2, maximumFractionDigits:2 }),
-  formatCurrency(v) { return this._fmt.format(Number(v) || 0); },
+  formatCurrency(v) {
+  return new Intl.NumberFormat(CONSTANTS.LOCALE, {
+    style: 'currency', currency: 'BRL', ...CONSTANTS.CURRENCY,
+  }).format(Number(v) || 0);
+  },
   todayISO()   { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; },
   today()      { return new Date().toLocaleDateString('pt-BR'); },
   nowTime()    { return new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); },
@@ -227,12 +230,14 @@ const Store = (() => {
    EventBus.emit('storage:quota-exceeded', col);
 
    try {
-     const _localDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-     const makeCorte  = (dias) => { const d = new Date(); d.setDate(d.getDate() - dias); return _localDate(d); };
-     const dtV = makeCorte(7);
-     const dtA = makeCorte(3);
-     const dtF = makeCorte(7);
-     const dtM = makeCorte(7);
+     const cortaVendas = new Date(); cortaVendas.setDate(cortaVendas.getDate() - 7);
+     const cortaAudit  = new Date(); cortaAudit.setDate(cortaAudit.getDate() - 3);
+     const cortaFin    = new Date(); cortaFin.setDate(cortaFin.getDate() - 7);
+     const cortaMov    = new Date(); cortaMov.setDate(cortaMov.getDate() - 7);
+     const dtV = cortaVendas.toISOString().slice(0,10);
+     const dtA = cortaAudit.toISOString().slice(0,10);
+     const dtF = cortaFin.toISOString().slice(0,10);
+     const dtM = cortaMov.toISOString().slice(0,10);
 
      const purgeCol = (c, dtCorte, key) => {
        try {
@@ -381,30 +386,62 @@ const Store = (() => {
    */
   purgeOldData({ diasVendas = 30, diasFinanceiro = 30, diasAuditoria = 7, diasMovimentacoes = 14, diasSaidas = 90 } = {}) {
     const corte = (dias) => {
-      const d = new Date();
-      d.setDate(d.getDate() - dias);
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+   const d = new Date();
+   d.setDate(d.getDate() - dias);
+   return d.toISOString().slice(0, 10);
     };
 
     let purged = {};
 
-    const _purgeCol = (col, campo, dtCorte) => {
-      const arr = _read(col);
-      if (!Array.isArray(arr)) return;
-      const filtrado = arr.filter(v => (v[campo] || '') >= dtCorte || !v._fbSynced);
-      if (filtrado.length < arr.length) { _write(col, filtrado); purged[col] = arr.length - filtrado.length; }
-    };
+    const vendasAntes = _read('vendas').length;
+    const cortaVendas = corte(diasVendas);
+    const vendasFiltradas = _read('vendas').filter(v =>
+   (v.dataCurta >= cortaVendas) || !v._fbSynced
+    );
+    if (vendasFiltradas.length < vendasAntes) {
+   _write('vendas', vendasFiltradas);
+   purged.vendas = vendasAntes - vendasFiltradas.length;
+    }
 
-    _purgeCol('vendas',        'dataCurta', corte(diasVendas));
-    _purgeCol('financeiro',    'dataCurta', corte(diasFinanceiro));
-    _purgeCol('auditoria',     'dataCurta', corte(diasAuditoria));
-    _purgeCol('movimentacoes', 'dataCurta', corte(diasMovimentacoes));
-    _purgeCol('saidas',        'dataCurta', corte(diasSaidas));
+    const finAntes = _read('financeiro').length;
+    const cortaFin = corte(diasFinanceiro);
+    const finFiltrado = _read('financeiro').filter(l => l.dataCurta >= cortaFin);
+    if (finFiltrado.length < finAntes) {
+   _write('financeiro', finFiltrado);
+   purged.financeiro = finAntes - finFiltrado.length;
+    }
+
+    const audAntes = _read('auditoria').length;
+    const cortaAud = corte(diasAuditoria);
+    const audFiltrada = _read('auditoria').filter(r => r.dataCurta >= cortaAud);
+    if (audFiltrada.length < audAntes) {
+   _write('auditoria', audFiltrada);
+   purged.auditoria = audAntes - audFiltrada.length;
+    }
+
+    const movAntes = _read('movimentacoes').length;
+    const cortaMov = corte(diasMovimentacoes);
+    const movFiltradas = _read('movimentacoes').filter(m => m.dataCurta >= cortaMov);
+    if (movFiltradas.length < movAntes) {
+   _write('movimentacoes', movFiltradas);
+   purged.movimentacoes = movAntes - movFiltradas.length;
+    }
+
+    // Saídas — mantém 90 dias por padrão (histórico longo)
+    const saiAntes = _read('saidas').length;
+    const cortaSai = corte(diasSaidas);
+    const saiFiltradas = _read('saidas').filter(s => (s.dataCurta || s.data || '') >= cortaSai);
+    if (saiFiltradas.length < saiAntes) {
+   _write('saidas', saiFiltradas);
+   purged.saidas = saiAntes - saiFiltradas.length;
+    }
 
     ['vendas','financeiro','auditoria','movimentacoes','saidas'].forEach(c => delete _cache[c]);
 
     const total = Object.values(purged).reduce((s, n) => s + n, 0);
-    if (total > 0) EventBus.emit('store:purged', purged);
+    if (total > 0) {
+   EventBus.emit('store:purged', purged);
+    }
     return purged;
   },
 
@@ -416,20 +453,19 @@ const Store = (() => {
     let totalBytes = 0;
     const detalhes = {};
     cols.forEach(([col, key]) => {
-      const raw   = localStorage.getItem(key) || '';
-      const bytes = new Blob([raw]).size;
-      totalBytes += bytes;
-      const parsed = _cache[col] ?? (raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null);
-      detalhes[col] = { kb: (bytes / 1024).toFixed(1), registros: Array.isArray(parsed) ? parsed.length : 1 };
+   const raw = localStorage.getItem(key) || '';
+   const bytes = new Blob([raw]).size;
+   totalBytes += bytes;
+   detalhes[col] = { kb: (bytes / 1024).toFixed(1), registros: Array.isArray(_read(col)) ? _read(col).length : 1 };
     });
     const limitKB = 5 * 1024;
     const usadoKB = totalBytes / 1024;
     return {
-      usadoKB:   usadoKB.toFixed(1),
-      limitKB,
-      percentual: ((usadoKB / limitKB) * 100).toFixed(1),
-      detalhes,
-      alerta:    usadoKB > limitKB * 0.7,
+   usadoKB:   usadoKB.toFixed(1),
+   limitKB,
+   percentual: ((usadoKB / limitKB) * 100).toFixed(1),
+   detalhes,
+   alerta:    usadoKB > limitKB * 0.7, // alerta acima de 70%
     };
   },
 
@@ -473,27 +509,22 @@ const Store = (() => {
 
   mutate(fn) {
     const map = {
-      estoque:'estoque', vendas:'vendas', comandas:'comandas',
-      fiado:'fiado', ponto:'ponto', pedidos:'pedidos',
-      config:'config', auditEstoque:'auditoria', auditLog:'auditoria',
-      movimentacoes:'movimentacoes', caixa:'vendas', inventario:'estoque',
+   estoque:'estoque', vendas:'vendas', comandas:'comandas',
+   fiado:'fiado', ponto:'ponto', pedidos:'pedidos',
+   config:'config', auditEstoque:'auditoria', auditLog:'auditoria',
+   movimentacoes:'movimentacoes', caixa:'vendas', inventario:'estoque',
     };
     const proxy = new Proxy({}, {
-      get(_, prop) { const col = map[prop]; return col ? _read(col) : undefined; },
-      set(_, prop, value) {
-        const col = map[prop];
-        if (!col) return true;
-        const limit = _limits[col];
-        const final = (limit && Array.isArray(value)) ? value.slice(0, limit) : value;
-        _write(col, final); _notify(col);
-        if (window.CH?.SyncQueue) {
-          const role = typeof AuthService !== 'undefined' ? AuthService.getRole() : null;
-          const permCore    = role && (CONSTANTS.PERMISSOES[role]?.escrever?.includes(col) ?? false);
-          const permUserSvc = role && window.CH?.UserService?.podeEscrever?.(role, col);
-          if (permCore || permUserSvc) window.CH.SyncQueue.enqueue('salvar', col, final);
-        }
-        return true;
-      },
+   get(_, prop) { const col = map[prop]; return col ? _read(col) : undefined; },
+   set(_, prop, value) {
+     const col = map[prop];
+     if (!col) return true;
+     const limit = _limits[col];
+     const final = (limit && Array.isArray(value)) ? value.slice(0, limit) : value;
+     _write(col, final); _notify(col);
+     if (window.CH?.SyncQueue) window.CH.SyncQueue.enqueue('salvar', col, final);
+     return true;
+   },
     });
     fn(proxy);
     EventBus.emit('store:updated');
@@ -834,58 +865,55 @@ const SyncService = (() => {
   async function pull(cols) {
   const role = AuthService.getRole();
   if (!role) return;
-  const alvo = cols || CONSTANTS.PERMISSOES[role]?.ler || [];
-  const ok   = await FirebaseService.init().catch(() => false);
+  const alvo = cols || CONSTANTS.PERMISSOES[role].ler;
+  const ok   = await FirebaseService.init();
   if (!ok) return;
 
   for (const col of alvo) {
-    let dados = null;
-    try {
-      dados = await FirebaseService.ler(col);
-    } catch(e) {
-      console.warn(`[SyncService.pull] Falha ao ler "${col}":`, e.message);
-      continue;
-    }
+    const dados = await FirebaseService.ler(col);
     if (dados == null) continue;
 
-    try {
-      if (col === 'vendas' || col === 'comandas' || col === 'fiado') {
-        const getLocal = col === 'vendas'   ? () => Store.getVendas()
-                       : col === 'comandas' ? () => Store.getComandas()
-                       : () => Store.getFiado();
-        const writeRaw = (data) => Store._writeRaw(col, data);
-        const maxLimit = col === 'vendas' ? CONSTANTS.MAX_VENDAS : (CONSTANTS.MAX_COMANDAS || 2000);
+    // ── Coleções com merge inteligente (nunca sobrescreve locais não enviados) ──
+    if (col === 'vendas' || col === 'comandas' || col === 'fiado') {
+      const getLocal = col === 'vendas'    ? () => Store.getVendas()
+                     : col === 'comandas'  ? () => Store.getComandas()
+                     : () => Store.getFiado();
+      const writeRaw = (data) => Store._writeRaw(col, data);
+      const maxLimit = col === 'vendas' ? CONSTANTS.MAX_VENDAS : (CONSTANTS.MAX_COMANDAS || 2000);
 
-        const local    = getLocal();
-        const localIds = new Set(local.map(v => v.id).filter(Boolean));
-        const novosDaNuvem = dados.filter(v => v.id && !localIds.has(v.id));
-        const remoteMap = new Map(dados.map(v => [v.id, v]));
-        const localFinal = local.map(v => {
-          const remoto = remoteMap.get(v.id);
-          if (remoto) {
-            const tsLocal  = v.updatedAt  || v.criadoEm || '';
-            const tsRemoto = remoto.updatedAt || remoto.criadoEm || '';
-            return tsRemoto > tsLocal ? remoto : v;
-          }
-          return v;
-        });
+      const local    = getLocal();
+      const localIds = new Set(local.map(v => v.id).filter(Boolean));
 
-        if (novosDaNuvem.length > 0 || localFinal.some((v, i) => v !== local[i])) {
-          const merged = [...novosDaNuvem, ...localFinal]
-            .sort((a, b) => (b.criadoEm||'') > (a.criadoEm||'') ? 1 : -1)
-            .slice(0, maxLimit);
-          writeRaw(merged);
+      // Itens do Firestore que ainda não existem localmente
+      const novosDaNuvem = dados.filter(v => v.id && !localIds.has(v.id));
+
+      // Itens locais que ainda não foram enviados (sem _fbSynced, ou status pendente)
+      // e itens do Firestore atualizados mais recentemente
+      const remoteMap = new Map((dados || []).map(v => [v.id, v]));
+      const localFinal = local.map(v => {
+        const remoto = remoteMap.get(v.id);
+        // Se existe nos dois lados, usa o mais recente
+        if (remoto) {
+          const tsLocal  = v.updatedAt  || v.criadoEm || '';
+          const tsRemoto = remoto.updatedAt || remoto.criadoEm || '';
+          return tsRemoto > tsLocal ? remoto : v;
         }
-      } else {
-        const key = CONSTANTS.DB[col.toUpperCase()];
-        if (key) { try { localStorage.setItem(key, JSON.stringify(dados)); } catch(_) {} }
-        Store.invalidate(col);
+        return v; // só local — mantém
+      });
+
+      if (novosDaNuvem.length > 0 || localFinal.some((v, i) => v !== local[i])) {
+        const merged = [...novosDaNuvem, ...localFinal]
+          .sort((a, b) => (b.criadoEm||'') > (a.criadoEm||'') ? 1 : -1)
+          .slice(0, maxLimit);
+        writeRaw(merged);
       }
-      EventBus.emit('store:updated', col);
-      EventBus.emit(`store:${col}`);
-    } catch(e) {
-      console.warn(`[SyncService.pull] Falha ao aplicar "${col}":`, e.message);
+    } else {
+   const key = CONSTANTS.DB[col.toUpperCase()];
+   if (key) { try { localStorage.setItem(key, JSON.stringify(dados)); } catch(_) {} }
+   Store.invalidate(col);
     }
+    EventBus.emit('store:updated', col);
+    EventBus.emit(`store:${col}`);
   }
   EventBus.emit('sync:pull:done');
   }
@@ -948,27 +976,22 @@ const AuthService = {
   } else {
     FirebaseService.clearAdminToken();
   }
-
-  // Sequência de boot pós-login em um único setTimeout escalonado
-  // 300ms: listeners realtime + fila de sync
-  // 800ms: pull do Firestore
-  // 2000ms: purge proativo de localStorage (uma única chamada)
-  // 3000ms: hidratação de coleções vazias
-  setTimeout(() => {
-    FirebaseService.init().then(() => FirebaseService.subscribeRealtime());
-    if (window.CH?.SyncQueue) window.CH.SyncQueue.processar();
-  }, 300);
-
-  setTimeout(() => SyncService.pull(), 800);
+  setTimeout(() => FirebaseService.init().then(() => FirebaseService.subscribeRealtime()), 300);
+  setTimeout(() => { SyncService.pull(); if (window.CH?.SyncQueue) window.CH.SyncQueue.processar(); }, 800);
 
   setTimeout(() => {
     const uso = Store.getLocalStorageUsage();
     if (Number(uso.percentual) > 80) {
-      UIService.showToast('Armazenamento acima de 80%', 'Limpando dados antigos...', 'warning');
+   UIService.showToast('Armazenamento acima de 80%', 'Limpando dados antigos...', 'warning');
+   Store.purgeOldData();
+   console.warn(`[Store] Purge proativo — estava em ${uso.percentual}%`);
+    } else if (Number(uso.percentual) > 70) {
+   console.warn(`[Store] localStorage em ${uso.percentual}% (${uso.usadoKB}KB) — monitorando`);
+   Store.purgeOldData();
+    } else {
+   Store.purgeOldData();
     }
-    Store.purgeOldData();
   }, 2000);
-
   setTimeout(() => Store.hydrateAsync(), 3000);
 
   EventBus.emit('auth:login', { role: session.role });
@@ -1015,13 +1038,9 @@ const UIService = {
   openModal(id)  { document.getElementById(id)?.classList.add('open'); },
   closeModal(id) { document.getElementById(id)?.classList.remove('open'); },
 
-  _clockTimer: null,
   startClock(id = 'clock') {
-  if (this._clockTimer) clearInterval(this._clockTimer);
   const tick = () => { const el = document.getElementById(id); if (el) el.textContent = new Date().toLocaleTimeString('pt-BR'); };
-  tick();
-  this._clockTimer = setInterval(tick, 1000);
-  return this._clockTimer;
+  tick(); setInterval(tick, 1000);
   },
 
   setSyncDot(ok, msg = '') {
@@ -1250,3 +1269,8 @@ if ('serviceWorker' in navigator) {
   });
   navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
 }
+
+  '%c CH Geladas core.js v4 %c Services ✓  Transactions ✓  SyncQueue ✓  Audit ✓',
+  'background:#1e293b;color:#60a5fa;font-weight:bold;padding:2px 6px;border-radius:4px',
+  'color:#94a3b8'
+);

@@ -1,1 +1,22 @@
-{"indexes": [], "fieldOverrides": []}
+{
+  "indexes": [
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dataCurta", "order": "DESCENDING" },
+        { "fieldPath": "criadoEm",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_deleted",  "order": "ASCENDING"  },
+        { "fieldPath": "dataCurta", "order": "DESCENDING" },
+        { "fieldPath": "criadoEm",  "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

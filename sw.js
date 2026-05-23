@@ -8,7 +8,7 @@
  *   - Fallback offline: serve do cache se rede falhar
  */
 
-const CACHE_NAME = 'ch-geladas-v1';
+const CACHE_NAME = 'ch-geladas-v2'; // v4.1 — bump força update nos 3 dispositivos com SW antigo
 
 // Recursos locais que devem funcionar offline
 const SHELL_URLS = [

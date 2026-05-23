@@ -1,177 +1,273 @@
 rules_version = '2';
 
 /**
- * CH Geladas PDV — Firestore Security Rules v3
+ * CH Geladas PDV — Firestore Security Rules v4.1
  * ─────────────────────────────────────────────────────────────────────
  *
+ * MELHORIAS v4.1 vs v4:
+ *   • Adicionadas regras para billing_pedidos (BillingService)
+ *   • Adicionadas regras para saas_filiais_{empresaId} (FilialService)
+ *   • Adicionadas regras para branding_{empresaId} (WhitelabelService)
+ *   Sem essas regras, as três coleções eram bloqueadas pela catch-all
+ *   `allow read, write: if false` — causando falha silenciosa em
+ *   cobranças PIX, gerenciamento de filiais e carregamento de branding.
+ *
  * COLEÇÕES E PERMISSÕES
- * ┌─────────────────────┬────────────────────┬──────────────────────────────┐
- * │  Coleção            │  Leitura           │  Escrita                     │
- * ├─────────────────────┼────────────────────┼──────────────────────────────┤
- * │  ch_dados/estoque   │  PDV + ADM         │  ADM (adminToken)            │
- * │  ch_dados/config    │  PDV + ADM         │  ADM (adminToken)            │
- * │  ch_dados/categorias│  PDV + ADM         │  ADM (adminToken)            │
- * │  ch_dados/*outros*  │  ADM               │  ADM (adminToken)            │
- * │  vendas/{id}        │  ADM               │  PDV + ADM                   │
- * │  movimentacoes/{id} │  ADM               │  ADM + sistema (transaction) │
- * │  categorias/{id}    │  PDV + ADM         │  ADM                         │
- * │  fornecedores/{id}  │  ADM               │  ADM                         │
- * │  backups/{data}/**  │  ADM               │  ADM (adminToken)            │
- * └─────────────────────┴────────────────────┴──────────────────────────────┘
+ * ┌──────────────────────────────────┬──────────────────┬──────────────────────────────┐
+ * │  Path                            │  Leitura         │  Escrita                     │
+ * ├──────────────────────────────────┼──────────────────┼──────────────────────────────┤
+ * │  ch_dados/{col}                  │  autenticado     │  autenticado + adminToken    │
+ * │  vendas/{id}                     │  autenticado     │  autenticado (create)        │
+ * │                                  │                  │  + adminToken (update/delete)│
+ * │  movimentacoes/{id}              │  autenticado     │  autenticado (create válido) │
+ * │  categorias/{id}                 │  autenticado     │  adminToken                  │
+ * │  fornecedores/{id}               │  autenticado     │  adminToken                  │
+ * │  backups/{data}/**               │  adminToken      │  adminToken                  │
+ * │  billing_pedidos/{id}            │  autenticado     │  create livre / update admin │
+ * │  saas_filiais_{emp}/{id}         │  autenticado     │  adminToken                  │
+ * │  branding_{emp}/{id}             │  autenticado     │  adminToken                  │
+ * │  saas_empresas/{id}              │  autenticado     │  autenticado (create)        │
+ * │                                  │                  │  dono/superAdmin (update)    │
+ * │  saas_usuarios/{uid}             │  autenticado     │  criação livre / admin upd   │
+ * │  saas_convites/{codigo}          │  autenticado     │  autenticado + conviteValido │
+ * │  saas_dados/{emp}/{col}/{doc}    │  autenticado     │  empresaId match ou admin    │
+ * └──────────────────────────────────┴──────────────────┴──────────────────────────────┘
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Funções auxiliares ───────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    //  FUNÇÕES AUXILIARES GLOBAIS
+    // ════════════════════════════════════════════════════════════════
 
+    /** Qualquer usuário autenticado (anônimo incluso) */
     function autenticado() {
       return request.auth != null;
     }
 
+    /** Documento ch_dados: exige campos 'dados' e 'ts' */
     function docValido(data) {
       return data.keys().hasAll(['dados', 'ts'])
           && data.ts is string
           && data.ts.size() > 0;
     }
 
+    /** Presença de adminToken com tamanho exato (64 chars = SHA-256 hex) */
     function temAdminToken(data) {
       return data.keys().hasAny(['adminToken'])
           && data.adminToken is string
-          && data.adminToken.size() >= 16;
+          && data.adminToken.size() == 64;
     }
 
+    /** Estrutura mínima de uma venda */
     function vendaValida(data) {
       return data.keys().hasAll(['id', 'total', 'itens', 'criadoEm'])
           && data.total is number
+          && data.total >= 0
           && data.itens is list;
     }
 
+    /** Estrutura mínima de uma movimentação */
     function movimentacaoValida(data) {
       return data.keys().hasAll(['produtoId', 'tipo', 'quantidade', 'timestamp'])
-          && data.quantidade is number;
+          && data.quantidade is number
+          && data.timestamp  is string
+          && data.timestamp.size() >= 10;
     }
 
-    // Coleções abertas para leitura por qualquer autenticado (PDV + ADM)
-    function colecaoPublica(colecao) {
-      return colecao in ['estoque', 'config', 'categorias'];
+    /** Estrutura mínima de um convite SaaS */
+    function conviteValido(data) {
+      return data.keys().hasAll(['codigo', 'empresaId', 'expiresAt'])
+          && data.codigo    is string
+          && data.empresaId is string
+          && data.expiresAt is string;
     }
 
-    // ─── /ch_dados/comandas — qualquer autenticado pode escrever ────
-    // Comandas são criadas por colaboradores/operadores sem adminToken
-    match /ch_dados/comandas {
-      allow read:  if autenticado();
-      allow write: if autenticado() && docValido(request.resource.data);
+    /** Estrutura mínima de um pedido de billing */
+    function billingPedidoValido(data) {
+      return data.keys().hasAll(['empresaId', 'planoId', 'valor', 'txid', 'status'])
+          && data.valor  is number
+          && data.valor  > 0
+          && data.status is string
+          && data.status == 'aguardando';
     }
 
-    // ─── /ch_dados/fiado — qualquer autenticado pode escrever ───────
-    match /ch_dados/fiado {
-      allow read:  if autenticado();
-      allow write: if autenticado() && docValido(request.resource.data);
-    }
+    // ════════════════════════════════════════════════════════════════
+    //  SISTEMA LEGADO — CH GELADAS (coleções globais)
+    // ════════════════════════════════════════════════════════════════
 
-    // ─── /ch_dados/cambio — qualquer autenticado pode escrever ──────
-    match /ch_dados/cambio {
-      allow read:  if autenticado();
-      allow write: if autenticado() && docValido(request.resource.data);
-    }
-
-    // ─── /ch_dados/perfis — qualquer autenticado pode ler, admin escreve ──
-    match /ch_dados/perfis {
-      allow read:  if autenticado();
-      allow write: if autenticado() && docValido(request.resource.data) && temAdminToken(request.resource.data);
-    }
-
-    // ─── /ch_dados/{colecao} ─────────────────────────────────────────
+    // ── /ch_dados/{colecao} ──────────────────────────────────────────
     match /ch_dados/{colecao} {
-
-      // Leitura: qualquer autenticado pode ler qualquer coleção.
-      // O controle de acesso por role é feito no app (SyncService.pull filtra por role).
-      // request.resource.data não existe em leituras — não pode ser usado aqui.
-      allow read: if autenticado();
-
-      // Escrita: exige adminToken e documento válido
+      allow read:  if autenticado();
       allow write: if autenticado()
                    && docValido(request.resource.data)
                    && temAdminToken(request.resource.data);
     }
 
-    // ─── /vendas/{vendaId} ───────────────────────────────────────────
-    // create: PDV e colaboradores (sem adminToken)
-    // update: qualquer autenticado (aprovação/validação pelo controlador/validador)
-    // delete: apenas admin (adminToken obrigatório)
+    // ── /vendas/{vendaId} ────────────────────────────────────────────
+    // PDV cria vendas; somente admin atualiza/deleta (Rules v4+)
     match /vendas/{vendaId} {
-      allow create: if autenticado() && vendaValida(request.resource.data);
+      allow create: if autenticado()
+                    && vendaValida(request.resource.data);
       allow read:   if autenticado();
-      allow update: if autenticado();
-      allow delete: if autenticado() && temAdminToken(request.resource.data);
+      allow update: if autenticado()
+                    && temAdminToken(request.resource.data);
+      allow delete: if autenticado()
+                    && temAdminToken(request.resource.data);
     }
 
-    // ─── /movimentacoes/{movId} ──────────────────────────────────────
+    // ── /movimentacoes/{movId} ───────────────────────────────────────
     match /movimentacoes/{movId} {
-      allow create: if autenticado() && movimentacaoValida(request.resource.data);
+      allow create: if autenticado()
+                    && movimentacaoValida(request.resource.data);
       allow read:   if autenticado();
-      allow update, delete: if autenticado()
-                             && temAdminToken(request.resource.data);
+      allow update,
+            delete: if autenticado()
+                    && temAdminToken(request.resource.data);
     }
 
-    // ─── /categorias/{catId} ─────────────────────────────────────────
+    // ── /categorias/{catId} ──────────────────────────────────────────
     match /categorias/{catId} {
       allow read:  if autenticado();
-      allow write: if autenticado() && temAdminToken(request.resource.data);
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
     }
 
-    // ─── /fornecedores/{fornId} ──────────────────────────────────────
+    // ── /fornecedores/{fornId} ───────────────────────────────────────
     match /fornecedores/{fornId} {
       allow read:  if autenticado();
-      allow write: if autenticado() && temAdminToken(request.resource.data);
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
     }
 
-    // ─── /backups/{data}/snapshots/{snapshotId} ──────────────────────
-    // Backup automático diário — apenas admin escreve e lê
+    // ── /backups/{data}/snapshots/{snapshotId} ───────────────────────
     match /backups/{data}/snapshots/{snapshotId} {
-      // Leitura: autenticado é suficiente (dados sensíveis já são sanitizados pelo BackupService)
-      allow read:  if autenticado();
-      // Escrita: exige adminToken (apenas admin pode gerar backups)
-      allow write: if autenticado() && temAdminToken(request.resource.data);
+      allow read:  if autenticado()
+                   && temAdminToken(request.resource.data);
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
     }
 
-    // ─── /ch_dados/usuarios — lista de usuarios sincronizada ────────
-    // Usuarios podem ser lidos por qualquer autenticado.
-    // Escrita exige adminToken (apenas admin cria/edita usuarios).
-    // Override da regra geral /ch_dados/{colecao} para explicitar.
-    // (A regra geral ja cobre, mas deixamos explícito para clareza.)
+    // ════════════════════════════════════════════════════════════════
+    //  BILLING — ASSINATURAS E PAGAMENTOS PIX (NOVO v4.1)
+    // ════════════════════════════════════════════════════════════════
 
-    // ─── SaaS: empresas, usuários, convites ─────────────────────────
-    match /saas_empresas/{empresaId} {
-      allow read:  if autenticado();
-      allow write: if autenticado();
-    }
-
-    match /saas_usuarios/{uid} {
-      allow read:  if autenticado();
-      allow write: if autenticado();
-    }
-
-    match /saas_convites/{codigo} {
-      allow read:  if autenticado();
-      allow write: if autenticado();
-    }
-
-    match /saas_dados/{empresaId}/{colecao}/{docId} {
-      allow read, write: if autenticado();
-    }
-
-    // ─── /ch_tripwire/{docId} — Log imutável de intrusões ────────────
-    // Qualquer autenticado (incluindo PDV anônimo) pode CRIAR.
-    // Ninguém pode atualizar ou deletar — nem o admin via console.
-    match /ch_tripwire/{docId} {
-      allow create: if autenticado();
+    // ── /billing_pedidos/{pedidoId} ──────────────────────────────────
+    // Pedido criado pelo BillingService ao gerar cobrança PIX.
+    // Qualquer autenticado cria; somente admin confirma (muda status).
+    // Pedidos nunca são deletados (auditoria financeira).
+    match /billing_pedidos/{pedidoId} {
+      allow create: if autenticado()
+                    && billingPedidoValido(request.resource.data);
       allow read:   if autenticado();
-      allow update, delete: if false;
+      allow update: if autenticado()
+                    && temAdminToken(request.resource.data);
+      allow delete: if false;
     }
 
-    // ─── Bloqueia tudo que não foi mapeado ───────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    //  MULTI-FILIAL (NOVO v4.1)
+    // ════════════════════════════════════════════════════════════════
+
+    // ── /saas_filiais_{empresaId}/{docId} ────────────────────────────
+    // FilialService usa padrão de ID composto no nome da coleção.
+    // Leitura livre para qualquer autenticado (necessário para listar
+    // filiais no PDV). Escrita exige adminToken.
+    //
+    // Nota: o padrão ideal seria sub-coleção em saas_dados/{emp}/filiais
+    // para que o wildcard funcionasse. Este padrão é um workaround que
+    // será migrado em versão futura.
+    match /saas_filiais_{empresaId}/{docId} {
+      allow read:  if autenticado();
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  WHITE-LABEL / BRANDING (NOVO v4.1)
+    // ════════════════════════════════════════════════════════════════
+
+    // ── /branding_{empresaId}/{docId} ────────────────────────────────
+    // Config de tema/logo por empresa. Leitura pública para autenticados
+    // (WhitelabelService carrega após login). Escrita somente admin.
+    match /branding_{empresaId}/{docId} {
+      allow read:  if autenticado();
+      allow write: if autenticado()
+                   && temAdminToken(request.resource.data);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  SAAS — MULTI-TENANT (isolamento por empresaId)
+    // ════════════════════════════════════════════════════════════════
+
+    // ── /saas_empresas/{empresaId} ───────────────────────────────────
+    match /saas_empresas/{empresaId} {
+      allow read: if autenticado();
+
+      allow create: if autenticado()
+                    && request.resource.data.keys().hasAll(['id','nome','plano','ownerId','ativo','criadoEm'])
+                    && request.resource.data.id == empresaId
+                    && request.resource.data.ativo == true;
+
+      allow update: if autenticado()
+                    && (
+                      temAdminToken(request.resource.data)
+                      ||
+                      (
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny(['ownerId', 'id'])
+                      )
+                    );
+
+      allow delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /saas_usuarios/{uid} ─────────────────────────────────────────
+    match /saas_usuarios/{uid} {
+      allow read: if autenticado();
+
+      allow create: if autenticado()
+                    && request.resource.data.keys().hasAll(['id','empresaId','nome','senhaHash','role','ativo','criadoEm'])
+                    && request.resource.data.id == uid
+                    && request.resource.data.ativo == true;
+
+      allow update: if autenticado()
+                    && temAdminToken(request.resource.data)
+                    && request.resource.data.empresaId == resource.data.empresaId;
+
+      allow delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /saas_convites/{codigo} ──────────────────────────────────────
+    match /saas_convites/{codigo} {
+      allow read:   if autenticado();
+      allow create: if autenticado()
+                    && conviteValido(request.resource.data);
+      allow update,
+            delete: if autenticado()
+                    && temAdminToken(request.resource.data);
+    }
+
+    // ── /saas_dados/{empresaId}/{colecao}/{docId} ────────────────────
+    match /saas_dados/{empresaId}/{colecao}/{docId} {
+      allow read: if autenticado();
+
+      allow write: if autenticado()
+                   && (
+                     temAdminToken(request.resource.data)
+                     ||
+                     (
+                       request.resource.data.keys().hasAny(['empresaId'])
+                       && request.resource.data.empresaId == empresaId
+                     )
+                     || !request.resource.data.keys().hasAny(['empresaId'])
+                   );
+    }
+
+    // ── Bloqueia TUDO não mapeado explicitamente ─────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

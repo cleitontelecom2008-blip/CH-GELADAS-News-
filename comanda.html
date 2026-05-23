@@ -888,5 +888,13 @@ window.addEventListener('DOMContentLoaded', () => {
   init();
 });
 </script>
+  <!-- ═══ Serviços v4.1 — adicionados pela auditoria (CRIT-03) ═══════════
+       Ordem obrigatória: featureFlagsService antes de filialService.
+       errorPreventionService e soundService se ativam via EventBus. -->
+  <script src="./services/featureFlagsService.js"></script>
+  <script src="./services/soundService.js"></script>
+  <script src="./services/errorPreventionService.js"></script>
+  <script src="./services/whitelabelService.js"></script>
+  <script src="./services/filialService.js"></script>
 </body>
 </html>
