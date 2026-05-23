@@ -203,10 +203,9 @@
   }
 
   function getResumoSemana() {
-    const hoje = new Date();
-    const dom  = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - hoje.getDay());
-    const domISO = `${dom.getFullYear()}-${String(dom.getMonth()+1).padStart(2,'0')}-${String(dom.getDate()).padStart(2,'0')}`;
-    const vendas = getVendasPeriodo(domISO, Utils.todayISO())
+    const hoje = new Date(), dom = new Date(hoje);
+    dom.setDate(hoje.getDate() - hoje.getDay());
+    const vendas = getVendasPeriodo(dom.toISOString().slice(0, 10), Utils.todayISO())
       .filter(v => ['concluida', 'validada'].includes(v.status));
     return {
       quantidade: vendas.length,
@@ -218,8 +217,7 @@
   function getProdutosMaisVendidos(limite = 10, periodo = 30) {
     const dm = new Date();
     dm.setDate(dm.getDate() - periodo);
-    const dmISO = `${dm.getFullYear()}-${String(dm.getMonth()+1).padStart(2,'0')}-${String(dm.getDate()).padStart(2,'0')}`;
-    const vendas = getVendasPeriodo(dmISO, Utils.todayISO())
+    const vendas = getVendasPeriodo(dm.toISOString().slice(0, 10), Utils.todayISO())
       .filter(v => ['concluida', 'validada'].includes(v.status));
     const mapa = {};
     vendas.forEach(venda => {

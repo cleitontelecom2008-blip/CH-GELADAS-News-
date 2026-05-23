@@ -195,30 +195,65 @@
   }
 
   // ── Relatório consolidado multi-filial ───────────────────────────
+  /**
+   * CORREÇÃO HIGH-02: getResumoConsolidado agora usa try/finally.
+   * Antes: exceção no loop deixava _setFilialId na filial errada,
+   *        corrompendo todas as operações seguintes do operador.
+   * Depois: finally garante restauração do estado mesmo em erro.
+   */
   async function getResumoConsolidado(dataDe, dataAte) {
     const FF = window.CH?.FeatureFlags;
     if (!FF?.pode('multi_filial')) return null;
 
-    const lista = await listar();
+    const lista  = await listar();
     const ativas = lista.filter(f => f.ativa);
     const resumos = [];
 
+    // Salva filial atual ANTES do loop — restaurada via finally em cada iteração
+    const filialOriginal = getFilialId();
+
     for (const filial of ativas) {
+      let dadosFilial = null;
       try {
-        const filialIdOrig = getFilialId();
         _setFilialId(filial.id);
         await Store.hydrateAsync(['vendas']);
+
         const vendas = Store.getVendas().filter(v =>
-          ['concluida','validada'].includes(v.status) &&
-          (!dataDe || v.dataCurta >= dataDe) &&
+          ['concluida', 'validada'].includes(v.status) &&
+          (!dataDe || v.dataCurta >= dataDe)            &&
           (!dataAte || v.dataCurta <= dataAte)
         );
-        const receita = vendas.reduce((s,v) => s + (v.total||0), 0);
-        const lucro   = vendas.reduce((s,v) => s + (v.lucro||0), 0);
-        resumos.push({ filial: filial.nome, filialId: filial.id, vendas: vendas.length, receita, lucro });
-        _setFilialId(filialIdOrig); // restaura
-      } catch (_) {}
+
+        dadosFilial = {
+          filial:   filial.nome,
+          filialId: filial.id,
+          vendas:   vendas.length,
+          receita:  vendas.reduce((s, v) => s + (v.total || 0), 0),
+          lucro:    vendas.reduce((s, v) => s + (v.lucro || 0), 0),
+          erro:     false,
+        };
+      } catch (e) {
+        console.warn(`[FilialService] getResumoConsolidado: falha na filial "${filial.nome}":`, e.message);
+        dadosFilial = {
+          filial:   filial.nome,
+          filialId: filial.id,
+          vendas:   0,
+          receita:  0,
+          lucro:    0,
+          erro:     true,
+        };
+      } finally {
+        // Restaura estado SEMPRE — independente de erro ou sucesso
+        _setFilialId(filialOriginal);
+      }
+
+      resumos.push(dadosFilial);
     }
+
+    // Re-hidrata dados da filial original após o loop
+    try {
+      await Store.hydrateAsync(['vendas']);
+    } catch (_) {}
 
     return resumos;
   }

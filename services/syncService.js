@@ -165,25 +165,11 @@
           const delay           = RETRY_DELAYS[item.tentativas - 1] ?? 60_000;
           item.proximaTentativa = Date.now() + delay;
           item.status           = item.tentativas >= MAX_RETRY ? 'erro' : 'pendente';
-
           console.warn(
-            `[SyncQueue] ts=${new Date().toISOString()} | colecao=${item.colecao} | tentativa=${item.tentativas}/${MAX_RETRY} | proximo=${delay/1000}s | erro=${e.message}`
+            `[SyncQueue] ✗ ${item.colecao} — tentativa ${item.tentativas}/${MAX_RETRY}`,
+            `— próxima em ${delay/1000}s:`, e.message
           );
           EventBus.emit('sync:error', { colecao: item.colecao, erro: e.message, tentativa: item.tentativas });
-
-          // Notifica o usuário quando o item é definitivamente descartado
-          if (item.tentativas >= MAX_RETRY) {
-            console.error(
-              `[SyncQueue] FALHA DEFINITIVA | ts=${new Date().toISOString()} | colecao=${item.colecao} | erro=${e.message}`
-            );
-            try {
-              window.CH?.UIService?.showToast(
-                'Falha de sincronização',
-                `"${item.colecao}" não pôde ser enviado após ${MAX_RETRY} tentativas. Verifique sua conexão.`,
-                'error'
-              );
-            } catch (_) {}
-          }
         }
       }
 
