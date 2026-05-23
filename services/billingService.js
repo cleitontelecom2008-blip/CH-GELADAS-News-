@@ -149,63 +149,41 @@
    * Confirma pagamento manualmente (admin).
    * Em produção, isso seria feito por um webhook do banco.
    */
-  /**
-   * CORREÇÃO HIGH-01: confirmarPagamento agora verifica role.
-   * Antes: qualquer cliente logado podia elevar o plano via console.
-   * Depois: apenas isOwner() ou isSuperAdmin() podem confirmar.
-   * Também injeta adminToken no batch do Firestore (Rules v4 exigem).
-   */
   async function confirmarPagamento(pedidoId) {
-    // Guard de role — apenas dono da empresa ou superAdmin
-    const SaaS = window.CH?.SaasService;
-    if (!SaaS?.isOwner?.() && !SaaS?.isSuperAdmin?.()) {
-      console.error('[BillingService] confirmarPagamento: permissão negada. Apenas o dono da empresa.');
-      EventBus.emit('billing:erro', { msg: 'Permissão negada para confirmar pagamento.' });
-      return false;
-    }
-
-    // Valida que o pedido existe e está pendente
-    const pedidoPendente = Store.getConfig()?.billing?.pedidoPendente;
-    if (!pedidoPendente || pedidoPendente.id !== pedidoId) {
-      console.error('[BillingService] confirmarPagamento: pedido não encontrado ou já processado.');
-      EventBus.emit('billing:erro', { msg: 'Pedido não encontrado ou já processado.' });
-      return false;
-    }
-
     Store.mutateConfig(cfg => {
-      cfg.billing.pedidoPendente  = null;
-      cfg.billing.ultimoPagamento = { ...pedidoPendente, status: 'pago', pagoEm: Utils.nowISO() };
+      const p = cfg.billing?.pedidoPendente;
+      if (p && p.id === pedidoId) {
+        cfg.billing.pedidoPendente = null;
+        cfg.billing.ultimoPagamento = { ...p, status: 'pago', pagoEm: Utils.nowISO() };
+      }
     });
 
-    const planoId = pedidoPendente.planoId;
+    const pedido  = Store.getConfig()?.billing?.ultimoPagamento;
+    const planoId = pedido?.planoId;
 
     if (planoId) {
+      // Atualiza plano da empresa no Firestore
       try {
         const FB = window.CH?.FirebaseService;
         if (FB?.isReady()) {
-          const sess = SaaS?.getSession?.();
+          const sess = window.CH?.SaasService?.getSession?.();
           if (sess?.empresaId) {
-            // adminToken obrigatório pelas Rules v4 em update de saas_empresas
-            const adminToken = FB.getAdminToken();
-            if (!adminToken) {
-              console.warn('[BillingService] adminToken ausente — plano não atualizado no Firestore.');
-            } else {
-              const batch  = FB.getBatch();
-              const empRef = FB.docRef('saas_empresas', sess.empresaId);
-              batch.set(empRef, {
-                plano:        planoId,
-                planoAtivoEm: Utils.nowISO(),
-                pedidoId,
-                adminToken,
-              }, { merge: true });
-              await batch.commit();
-            }
+            // Atualiza o campo plano na empresa
+            const batch = FB.getBatch();
+            const empRef = FB.docRef('saas_empresas', sess.empresaId);
+            batch.set(empRef, {
+              plano:        planoId,
+              planoAtivoEm: Utils.nowISO(),
+              pedidoId,
+            }, { merge: true });
+            await batch.commit();
           }
         }
       } catch (e) {
-        console.warn('[BillingService] Falha ao atualizar plano no Firestore:', e.message);
+        console.warn('[Billing] Falha ao atualizar plano:', e.message);
       }
 
+      // Atualiza featureflags em memória
       window.CH?.FeatureFlags?.setPlano?.(planoId);
     }
 
