@@ -58,7 +58,7 @@
           console.warn('[Store] localStorage cheio — executando purge automático...');
           EventBus.emit('storage:quota-exceeded', col);
           try {
-            const corte = (dias) => { const d=new Date(); d.setDate(d.getDate()-dias); return d.toISOString().slice(0,10); };
+            const corte = (dias) => { const d=new Date(); d.setDate(d.getDate()-dias); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
             const purgeCol = (c, dtCorte, key) => {
               try {
                 const arr = JSON.parse(localStorage.getItem(key)||'[]');
@@ -72,7 +72,6 @@
             purgeCol('financeiro',    corte(7),  _key.financeiro);
             purgeCol('movimentacoes', corte(7),  _key.movimentacoes);
             localStorage.setItem(_key[col], JSON.stringify(data));
-            console.info('[Store] Purge de emergência concluído.');
           } catch(e2) {
             console.error('[Store] localStorage crítico — dado só em memória:', col, e2);
             EventBus.emit('storage:critical', col);
@@ -121,7 +120,6 @@
         if (Array.isArray(old.ponto)    && old.ponto.length)    _write('ponto',    old.ponto);
         if (Array.isArray(old.pedidos)  && old.pedidos.length)  _write('pedidos',  old.pedidos);
         if (old.config && typeof old.config==='object')         _write('config',   old.config);
-        console.info('[Store] Banco legado migrado.');
       } catch(e) { console.warn('[Store] Migração falhou:', e); }
     }
 
@@ -192,21 +190,22 @@
 
       _writeRaw(col, data) { _write(col, data); _notify(col); },
 
-      purgeOldData({ diasVendas=30, diasFinanceiro=30, diasAuditoria=7, diasMovimentacoes=14 }={}) {
-        const corte = (dias) => { const d=new Date(); d.setDate(d.getDate()-dias); return d.toISOString().slice(0,10); };
+      purgeOldData({ diasVendas=30, diasFinanceiro=30, diasAuditoria=7, diasMovimentacoes=14, diasSaidas=90 }={}) {
+        const corte = (dias) => { const d=new Date(); d.setDate(d.getDate()-dias); const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; };
         let purged={};
         const purgeOne = (col, dtCorte, campo) => {
           const antes=_read(col).length;
           const filtrado=_read(col).filter(v=>(v[campo]>=dtCorte)||!v._fbSynced);
           if(filtrado.length<antes){_write(col,filtrado);purged[col]=antes-filtrado.length;}
         };
-        purgeOne('vendas','dataCurta',corte(diasVendas));
-        purgeOne('financeiro','dataCurta',corte(diasFinanceiro));
-        purgeOne('auditoria','dataCurta',corte(diasAuditoria));
-        purgeOne('movimentacoes','dataCurta',corte(diasMovimentacoes));
-        ['vendas','financeiro','auditoria','movimentacoes'].forEach(c=>delete _cache[c]);
+        purgeOne('vendas',        corte(diasVendas),        'dataCurta');
+        purgeOne('financeiro',    corte(diasFinanceiro),    'dataCurta');
+        purgeOne('auditoria',     corte(diasAuditoria),     'dataCurta');
+        purgeOne('movimentacoes', corte(diasMovimentacoes), 'dataCurta');
+        purgeOne('saidas',        corte(diasSaidas),        'dataCurta');
+        ['vendas','financeiro','auditoria','movimentacoes','saidas'].forEach(c=>delete _cache[c]);
         const total=Object.values(purged).reduce((s,n)=>s+n,0);
-        if(total>0){console.info('[Store] Purge:',purged,`— ${total} registros removidos`);EventBus.emit('store:purged',purged);}
+        if(total>0){EventBus.emit('store:purged',purged);}
         return purged;
       },
 
@@ -238,7 +237,6 @@
             _write(col, col==='vendas'&&Array.isArray(remoto)?remoto.slice(0,_limits.vendas):remoto);
             delete _cache[col];
             _notify(col);
-            console.info(`[Store] Hidratado: ${col} (${Array.isArray(remoto)?remoto.length:1})`);
           } catch(e){console.warn(`[Store] Hidratação falhou ${col}:`,e.message);}
         }
       },
@@ -313,7 +311,7 @@
           const localFinal=local.map(v=>{const r=remoteMap.get(v.id);if(r){const tl=v.updatedAt||v.criadoEm||'',tr=r.updatedAt||r.criadoEm||'';return tr>tl?r:v;}return v;});
           if(novosDaNuvem.length>0||localFinal.some((v,i)=>v!==local[i])){
             const merged=[...novosDaNuvem,...localFinal].sort((a,b)=>(b.criadoEm||'')>(a.criadoEm||'')?1:-1).slice(0,maxLimit);
-            Store._writeRaw(col,merged); console.info(`[Sync] Merge ${col}: +${novosDaNuvem.length} da nuvem.`);
+            Store._writeRaw(col,merged);
           }
         } else {
           const key=CONSTANTS.DB[col.toUpperCase()];
@@ -323,7 +321,6 @@
         EventBus.emit('store:updated',col); EventBus.emit(`store:${col}`);
       }
       EventBus.emit('sync:pull:done');
-      console.info('[Sync] Pull concluído para role:', role);
     }
 
     return { push, pull, flush:_flush };
@@ -333,5 +330,4 @@
   window.CH.Store       = Store;
   window.CH.SyncService = SyncService;
 
-  console.info('%c storeService.js ✓','color:#10b981;font-weight:bold');
 })();

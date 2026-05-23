@@ -58,12 +58,6 @@
 
   /** Registra receita de uma venda */
   function registrarReceita(venda) {
-    // Só registra vendas efetivamente concluídas ou validadas
-    // Vendas pendentes/aprovadas aguardam validação do analista
-    if (venda.status && !['concluida','validada'].includes(venda.status)) {
-      console.info(`[FinanceiroService] Venda ${venda.id} ignorada (status: ${venda.status})`);
-      return;
-    }
     return _lancar({
       tipo:       'receita',
       categoria:  'venda',
@@ -169,7 +163,6 @@
   function getResumoMes(ano = new Date().getFullYear(), mes = new Date().getMonth() + 1) {
     const dataDe = `${ano}-${String(mes).padStart(2,'0')}-01`;
     const dataAte = `${ano}-${String(mes).padStart(2,'0')}-31`;
-    const caixa  = getCaixaDia(dataDe); // usa range
     const lancamentos = getLancamentos({ dataDe, dataAte });
     const receitas = lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
     const despesas = lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
@@ -189,11 +182,10 @@
   }
 
   // ── Hooks automáticos ─────────────────────────────────────────────
-  EventBus.on('venda:finalizada', venda => {
-    // Dupla verificação: só processa se venda foi realmente concluída/validada
-    if (!venda.status || ['concluida','validada'].includes(venda.status)) {
-      registrarReceita(venda);
-    }
+  EventBus.on('venda:finalizada',       venda => registrarReceita(venda));
+  // Lote de validação (aprovacaoService.validarTodas) emite um array de vendas
+  EventBus.on('venda:finalizada:lote',  vendas => {
+    if (Array.isArray(vendas)) vendas.forEach(v => registrarReceita(v));
   });
   EventBus.on('venda:cancelada',      ({ vendaId }) => {
     const venda = window.CH.Store.getVendas().find(v => v.id === vendaId);
@@ -216,5 +208,4 @@
     exportarCSV,
   };
 
-  console.info('%c FinanceiroService ✓  (Integrado com vendas + estoque)', 'color:#10b981');
 })();
