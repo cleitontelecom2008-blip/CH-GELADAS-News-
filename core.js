@@ -1270,6 +1270,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
 }
 
+console.log(
   '%c CH Geladas core.js v4 %c Services ✓  Transactions ✓  SyncQueue ✓  Audit ✓',
   'background:#1e293b;color:#60a5fa;font-weight:bold;padding:2px 6px;border-radius:4px',
   'color:#94a3b8'
