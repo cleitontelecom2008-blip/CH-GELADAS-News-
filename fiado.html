@@ -436,13 +436,13 @@ async function doLogin() {
     const user = await window.CH.UserService.login(nome, senha);
     ok = !!user;
   } else {
-    ok = await AuthService.login(senha);
+    ok = await window.CH.AuthService.login(senha);
   }
   if (ok) {
     document.getElementById('lock').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    const _r = AuthService.getRole();
-    if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+    const _r = window.CH.AuthService.getRole();
+    if (window.CH.AuthService.isAdmin()) document.body.classList.add('is-admin');
     const rt = document.getElementById('roleTag');
     if (rt) {
       const _pi = window.CH && window.CH.PermissoesService && window.CH.PermissoesService.getPerfil && window.CH.PermissoesService.getPerfil(_r);
@@ -459,7 +459,7 @@ async function doLogin() {
 }
 document.getElementById('loginSenha').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
 document.getElementById('loginNome').addEventListener('keydown',  function(e) { if (e.key === 'Enter') document.getElementById('loginSenha').focus(); });
-function logout() { if (!confirm('Encerrar sessão?')) return; AuthService.logout(); location.reload(); }
+function logout() { if (!confirm('Encerrar sessão?')) return; window.CH.AuthService.logout(); location.reload(); }
 
 /* ═══════════ ESTADO ═══════════ */
 let _clienteAtualId = null;
@@ -467,7 +467,7 @@ let _clienteAtualId = null;
 /* ═══════════ INIT ═══════════ */
 function init() {
   UIService.startClock('clock');
-  if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+  if (window.CH.AuthService.isAdmin()) document.body.classList.add('is-admin');
   // Força pull do Firestore para carregar dados atualizados em qualquer aparelho
   if (window.CH?.SyncService) {
     window.CH.SyncService.pull(['fiado']).then(() => {
@@ -582,7 +582,7 @@ function renderDetalhe() {
   // Botão excluir: só visível quando quitado (saldo=0)
   const btnExcluir = document.getElementById('btnExcluirCliente');
   if (btnExcluir) {
-    if (quitado && AuthService.isAdmin()) {
+    if (quitado && window.CH.AuthService.isAdmin()) {
       btnExcluir.style.display = 'flex';
       btnExcluir.title = 'Excluir cliente (saldo zerado)';
     } else {
@@ -740,7 +740,7 @@ function _renderPagamentos(c) {
       </div>
       <div class="flex items-center gap-2 flex-shrink-0">
         <p class="text-[12px] font-black ${cor}">-${Utils.formatCurrency(m.valor)}</p>
-        ${AuthService.isAdmin() ? `<button onclick="apagarMovimentacao('${m.id}')" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center"><i class="fas fa-times text-[9px]"></i></button>` : ''}
+        ${window.CH.AuthService.isAdmin() ? `<button onclick="apagarMovimentacao('${m.id}')" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center"><i class="fas fa-times text-[9px]"></i></button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -998,7 +998,7 @@ async function confirmarParcela(forma) {
             tipo:       'venda',
             quantidade: qtdBaixa,
             origem:     'fiado-parcela',
-            operador:   AuthService.getNome(),
+            operador:   window.CH.AuthService.getNome(),
             observacao: `Parcela fiado — ${_nomeCliente} (${Utils.formatCurrency(valor)})`,
           });
         } catch(e) {
@@ -1165,7 +1165,7 @@ function _set(id,val) { const el=document.getElementById(id); if(el) el.textCont
 
 /* ═══════ ADM — CONTROLES ═══════ */
 function zerarSaldoCliente() {
-  if (!AuthService.isAdmin()) return;
+  if (!window.CH.AuthService.isAdmin()) return;
   const c = Store.getFiado().find(x=>x.id===_clienteAtualId);
   if (!c) return;
   if (!confirm(`Zerar saldo de ${c.nome}? (${Utils.formatCurrency(c.saldo||0)})`)) return;
@@ -1182,7 +1182,7 @@ function zerarSaldoCliente() {
 }
 
 function apagarMovimentacao(movId) {
-  if (!AuthService.isAdmin()) return;
+  if (!window.CH.AuthService.isAdmin()) return;
   if (!confirm('Apagar esta movimentação?')) return;
   Store.mutateFiado(fiado => {
     const c = fiado.find(x=>x.id===_clienteAtualId);
@@ -1195,7 +1195,7 @@ function apagarMovimentacao(movId) {
 }
 
 function excluirCliente() {
-  if (!AuthService.isAdmin()) return;
+  if (!window.CH.AuthService.isAdmin()) return;
   const c = Store.getFiado().find(x=>x.id===_clienteAtualId);
   if (!c) return;
   if ((c.saldo||0) > 0) {
@@ -1212,11 +1212,11 @@ function excluirCliente() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  if (!AuthService.isLogged()) { location.href = 'index.html'; return; }
+  if (!window.CH.AuthService.isLogged()) { location.href = 'index.html'; return; }
   document.getElementById('lock').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  const _role = AuthService.getRole();
-  if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+  const _role = window.CH.AuthService.getRole();
+  if (window.CH.AuthService.isAdmin()) document.body.classList.add('is-admin');
   const rt = document.getElementById('roleTag');
   if (rt) {
     const _info = window.CH?.PermissoesService?.getPerfil?.(_role);
@@ -1226,5 +1226,13 @@ window.addEventListener('DOMContentLoaded', () => {
   init();
 });
 </script>
+  <!-- ═══ Serviços v4.1 — adicionados pela auditoria (CRIT-03) ═══════════
+       Ordem obrigatória: featureFlagsService antes de filialService.
+       errorPreventionService e soundService se ativam via EventBus. -->
+  <script src="./services/featureFlagsService.js"></script>
+  <script src="./services/soundService.js"></script>
+  <script src="./services/errorPreventionService.js"></script>
+  <script src="./services/whitelabelService.js"></script>
+  <script src="./services/filialService.js"></script>
 </body>
 </html>

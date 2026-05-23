@@ -440,13 +440,13 @@ async function doLogin() {
     const user = await window.CH.UserService.login(nome, senha);
     ok = !!user;
   } else {
-    ok = await AuthService.login(senha);
+    ok = await window.CH.AuthService.login(senha);
   }
   if (ok) {
     document.getElementById('lock').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    const _r = AuthService.getRole();
-    if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+    const _r = window.CH.AuthService.getRole();
+    if (window.CH.AuthService.isAdmin()) document.body.classList.add('is-admin');
     const rt = document.getElementById('roleTag');
     if (rt) {
       const _pi = window.CH && window.CH.PermissoesService && window.CH.PermissoesService.getPerfil && window.CH.PermissoesService.getPerfil(_r);
@@ -463,7 +463,7 @@ async function doLogin() {
 }
 document.getElementById('loginSenha').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
 document.getElementById('loginNome').addEventListener('keydown',  function(e) { if (e.key === 'Enter') document.getElementById('loginSenha').focus(); });
-function logout() { if (!confirm('Encerrar sessão?')) return; AuthService.logout(); location.reload(); }
+function logout() { if (!confirm('Encerrar sessão?')) return; window.CH.AuthService.logout(); location.reload(); }
 
 /* ══ INIT ══ */
 function init() {
@@ -625,7 +625,7 @@ function abrirPagamento() {
   // ── Bloqueio de pré-requisitos para colaborador/PDV ────────────
   // Admin e gerente são isentos — operam mesmo sem caixa ou ponto.
   const { Store, AuthService, Utils } = window.CH;
-  const _role = AuthService.getRole();
+  const _role = window.CH.AuthService.getRole();
   const _rolesLivres = ['admin', 'adm', 'gerente'];
 
   if (!_rolesLivres.includes(_role)) {
@@ -843,8 +843,8 @@ function confirmarFiado(clienteId) {
       lucro:        itens.reduce((s,i) => s + (i.preco-(i.custo||0))*i.qtd, 0),
       formaPgto:    `Fiado — ${cliente.nome}`,
       origem:       'PDV',
-      operador:     AuthService.getNome(),
-      role:         AuthService.getRole(),
+      operador:     window.CH.AuthService.getNome(),
+      role:         window.CH.AuthService.getRole(),
       status:       'pendente',
       _fbSynced:    false,
       _fiado:       true,
@@ -937,7 +937,7 @@ function finalizarVenda(forma, troco = 0, parcelaDinheiro = 0, formaRestante = '
       hora: Utils.nowTime(), criadoEm: Utils.nowISO(),
       itens, total, subtotal, desconto, lucro,
       formaPgto: forma || 'Dinheiro', origem: 'PDV',
-      operador: AuthService.getNome(), role: AuthService.getRole(),
+      operador: window.CH.AuthService.getNome(), role: window.CH.AuthService.getRole(),
       status: 'pendente', _fbSynced: false,
       _troco: troco, _parcelaDinheiro: parcelaDinheiro,
       _parcelaRestante: parcelaRestante, _formaRestante: formaRestante,
@@ -1183,14 +1183,14 @@ function _setText(id,val) { const el=document.getElementById(id); if(el) el.text
 
 /* ══ INIT SESSÃO ══ */
 window.addEventListener('DOMContentLoaded', () => {
-  if (!AuthService.isLogged()) {
+  if (!window.CH.AuthService.isLogged()) {
     location.href = 'index.html';
     return;
   }
   document.getElementById('lock').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  const _role = AuthService.getRole();
-  if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+  const _role = window.CH.AuthService.getRole();
+  if (window.CH.AuthService.isAdmin()) document.body.classList.add('is-admin');
   const rt = document.getElementById('roleTag');
   if (rt) {
     const _info = window.CH?.PermissoesService?.getPerfil?.(_role);
@@ -1200,5 +1200,13 @@ window.addEventListener('DOMContentLoaded', () => {
   init();
 });
 </script>
+  <!-- ═══ Serviços v4.1 — adicionados pela auditoria (CRIT-03) ═══════════
+       Ordem obrigatória: featureFlagsService antes de filialService.
+       errorPreventionService e soundService se ativam via EventBus. -->
+  <script src="./services/featureFlagsService.js"></script>
+  <script src="./services/soundService.js"></script>
+  <script src="./services/errorPreventionService.js"></script>
+  <script src="./services/whitelabelService.js"></script>
+  <script src="./services/filialService.js"></script>
 </body>
 </html>

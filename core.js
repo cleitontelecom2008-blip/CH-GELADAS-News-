@@ -553,9 +553,9 @@ const Store = (() => {
 const FirebaseService = (() => {
   const CONFIG = {
   apiKey:            'AIzaSyDdFvTRQQmomMiLD0byrBwGZnitSC0zwus',
-  authDomain:        'new-ch-geladas.firebaseapp.com',
-  projectId:         'new-ch-geladas',
-  storageBucket:     'new-ch-geladas.firebasestorage.app',
+  authDomain:        'ch-geladas.firebaseapp.com',
+  projectId:         'ch-geladas',
+  storageBucket:     'ch-geladas.firebasestorage.app',
   messagingSenderId: '898297448757',
   appId:             '1:898297448757:web:d59cb5336d61d19ad9a47c',
   measurementId:     'G-QYJRW9YEPW',

@@ -191,22 +191,22 @@
     const err = document.getElementById('loginErr');
     err.classList.add('hidden');
 
-    const ok = await AuthService.login(pin);
-    if (!ok || AuthService.getRole() !== 'admin') {
+    const ok = await window.CH.AuthService.login(pin);
+    if (!ok || window.CH.AuthService.getRole() !== 'admin') {
       err.classList.remove('hidden');
-      AuthService.logout?.();
+      window.CH.AuthService.logout?.();
       return;
     }
     iniciarMonitor();
   };
 
   window.sair = function () {
-    AuthService.logout();
+    window.CH.AuthService.logout();
     location.reload();
   };
 
   // ── Verificar se já está logado como admin ───────────────────────
-  if (AuthService.isLogged() && AuthService.getRole() === 'admin') {
+  if (window.CH.AuthService.isLogged() && window.CH.AuthService.getRole() === 'admin') {
     iniciarMonitor();
   }
 
@@ -216,7 +216,7 @@
     document.getElementById('monitorWrap').style.display = 'block';
 
     document.getElementById('sessionInfo').textContent =
-      `Logado como: ${AuthService.getNome?.() || 'Admin'} · ${AuthService.getRole()}`;
+      `Logado como: ${window.CH.AuthService.getNome?.() || 'Admin'} · ${window.CH.AuthService.getRole()}`;
 
     _iniciarRelogio();
     _atualizarTudo();

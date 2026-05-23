@@ -202,8 +202,8 @@ let _temValidacao = false;
 
 // ── AUTH GUARD ────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  if (!AuthService.isLogged()) { location.href = 'index.html'; return; }
-  _role = AuthService.getRole();
+  if (!window.CH.AuthService.isLogged()) { location.href = 'index.html'; return; }
+  _role = window.CH.AuthService.getRole();
   const roleEl = document.getElementById('roleTag');
   if (roleEl) {
     const info = window.CH.PermissoesService?.getPerfil(_role) || {};

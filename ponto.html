@@ -272,13 +272,13 @@ async function doLogin() {
     const user = await window.CH.UserService.login(nome, senha);
     ok = !!user;
   } else {
-    ok = await AuthService.login(senha);
+    ok = await window.CH.AuthService.login(senha);
   }
   if (ok) {
     document.getElementById('lock').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    const _r = AuthService.getRole();
-    if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+    const _r = window.CH.AuthService.getRole();
+    if (window.CH.AuthService.isAdmin()) document.body.classList.add('is-admin');
     const rt = document.getElementById('roleTag');
     if (rt) {
       const _pi = window.CH && window.CH.PermissoesService && window.CH.PermissoesService.getPerfil && window.CH.PermissoesService.getPerfil(_r);
@@ -295,7 +295,7 @@ async function doLogin() {
 }
 document.getElementById('loginSenha').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
 document.getElementById('loginNome').addEventListener('keydown',  function(e) { if (e.key === 'Enter') document.getElementById('loginSenha').focus(); });
-function logout() { if (!confirm('Encerrar sessão?')) return; AuthService.logout(); location.reload(); }
+function logout() { if (!confirm('Encerrar sessão?')) return; window.CH.AuthService.logout(); location.reload(); }
 
 /* ════════════════════════════════
    ESTADO
@@ -459,7 +459,7 @@ function renderLista() {
             <p class="text-[8px] text-slate-500 font-bold">${p.horaFull||p.hora||'—'}</p>
           </div>
           <span class="badge ${entrada ? 'b-green' : 'b-red'} flex-shrink-0">${p.tipo}</span>
-          ${AuthService.isAdmin() ? `<button onclick="apagarPonto('${p.id}')" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center transition-all ml-1" title="Apagar"><i class="fas fa-times text-[9px]"></i></button>` : ''}
+          ${window.CH.AuthService.isAdmin() ? `<button onclick="apagarPonto('${p.id}')" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center transition-all ml-1" title="Apagar"><i class="fas fa-times text-[9px]"></i></button>` : ''}
         </div>`;
       }).join('');
 
@@ -719,7 +719,7 @@ function _set(id, val) { const el=document.getElementById(id); if(el) el.textCon
 ════════════════════════════════ */
 /* ═══════════ ADM — APAGAR PONTO ═══════════ */
 function apagarPonto(id) {
-  if (!AuthService.isAdmin()) return;
+  if (!window.CH.AuthService.isAdmin()) return;
   if (!confirm('Apagar este registro de ponto?')) return;
   Store.mutatePonto(ponto => {
     const idx = ponto.findIndex(p=>p.id===id);
@@ -755,7 +755,7 @@ function abrirCaixa() {
     abertoEm:     new Date().toISOString(),
     trocoInicial: troco,
     obs,
-    operador:     AuthService.getNome(),
+    operador:     window.CH.AuthService.getNome(),
   };
   _caixaAberto = true;
   try { localStorage.setItem('CH_CAIXA_ATUAL', JSON.stringify(_caixaAtual)); } catch(_) {}
@@ -865,11 +865,11 @@ function atualizarUICaixa() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  if (!AuthService.isLogged()) { location.href = 'index.html'; return; }
+  if (!window.CH.AuthService.isLogged()) { location.href = 'index.html'; return; }
   document.getElementById('lock').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  const _role = AuthService.getRole();
-  if (AuthService.isAdmin()) document.body.classList.add('is-admin');
+  const _role = window.CH.AuthService.getRole();
+  if (window.CH.AuthService.isAdmin()) document.body.classList.add('is-admin');
   const rt = document.getElementById('roleTag');
   if (rt) {
     const _info = window.CH?.PermissoesService?.getPerfil?.(_role);

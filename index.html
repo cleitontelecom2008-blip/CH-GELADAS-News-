@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="icon-96.png" type="image/png">
+  <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#04060d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -842,7 +843,7 @@ async function doLogin() {
     const user = await window.CH.UserService.login(nome, senha);
     ok = !!user;
   } else {
-    ok = await AuthService.login(senha);
+    ok = await window.CH.AuthService.login(senha);
   }
 
   if (ok) {
@@ -850,7 +851,7 @@ async function doLogin() {
     setTimeout(() => {
       document.getElementById('lock').style.display = 'none';
       document.getElementById('hub').classList.add('show');
-      const _role = AuthService.getRole();
+      const _role = window.CH.AuthService.getRole();
       if (['adm','admin'].includes(_role)) document.body.classList.add('is-admin');
       if (_role === 'controlador') document.body.classList.add('is-controlador');
       if (_role === 'validador')   document.body.classList.add('is-validador');
@@ -870,7 +871,7 @@ document.getElementById('loginNome').addEventListener('keyup', e => { if (e.key 
 
 function doLogout() {
   if (!confirm('Encerrar sessão?')) return;
-  AuthService.logout();
+  window.CH.AuthService.logout();
   location.reload();
 }
 
@@ -915,8 +916,8 @@ function iniciarHub() {
    HERO
 ══════════════════════════════════ */
 function _atualizarHero() {
-  const isAdmin = AuthService.isAdmin();
-  const nome    = AuthService.getNome();
+  const isAdmin = window.CH.AuthService.isAdmin();
+  const nome    = window.CH.AuthService.getNome();
   const roleEl  = document.getElementById('heroRole');
   const nomeEl  = document.getElementById('heroNome');
   const dataEl  = document.getElementById('heroData');
@@ -924,14 +925,14 @@ function _atualizarHero() {
 
   if (nomeEl) nomeEl.textContent = nome;
   if (roleEl) {
-    const _r = AuthService.getRole();
+    const _r = window.CH.AuthService.getRole();
     const _ri = window.CH.UserService?.PERMISSOES_ROLES?.[_r] || {};
     roleEl.textContent = _ri.label || _r.toUpperCase();
     const rcls = { adm:'role-admin', admin:'role-admin', controlador:'role-ctrl', validador:'role-valid', colaborador:'role-pdv', gerente:'role-gerente', operador:'role-pdv', pdv:'role-pdv' };
     roleEl.className   = 'hero-role ' + (rcls[_r] || 'role-pdv');
   }
   if (avatarEl) {
-    const _rr = AuthService.getRole();
+    const _rr = window.CH.AuthService.getRole();
     const _rri = window.CH.UserService?.PERMISSOES_ROLES?.[_rr] || {};
     avatarEl.textContent = _rri.icone || '🛒';
   }
@@ -958,7 +959,7 @@ function _startClock() {
 ══════════════════════════════════ */
 function _atualizarStats() {
   const hoje   = Utils.todayISO();
-  const isAdmin = AuthService.isAdmin();
+  const isAdmin = window.CH.AuthService.isAdmin();
   const vendas  = Store.getVendas().filter(v => v.dataCurta === hoje && v.status !== 'cancelada');
   const fatur   = vendas.reduce((s,v) => s + (v.total||0), 0);
   const lucro   = vendas.reduce((s,v) => s + (v.lucro||0), 0);
@@ -1183,7 +1184,7 @@ async function _testarTelegram() {
 }
 
 function abrirConfig() {
-  if (!AuthService.isAdmin()) { showToast('Apenas admin', '', 'error'); return; }
+  if (!window.CH.AuthService.isAdmin()) { showToast('Apenas admin', '', 'error'); return; }
   _carregarConfig();
   _atualizarStatusBackup();
   const m = document.getElementById('modalConfig');
@@ -1264,7 +1265,7 @@ async function downloadBackup() {
    GRÁFICO SEMANAL
 ══════════════════════════════════ */
 function _atualizarGraficoSemanal() {
-  if (!AuthService.isAdmin()) return;
+  if (!window.CH.AuthService.isAdmin()) return;
   const card = document.getElementById('graficoSemanalCard');
   if (!card) return;
 
@@ -1338,7 +1339,7 @@ function _atualizarGraficoSemanal() {
 let _modalTabAtual = 'usuarios';
 
 function abrirGestaoUsuarios() {
-  if (!AuthService.isAdmin()) { showToast('Apenas admin', '', 'error'); return; }
+  if (!window.CH.AuthService.isAdmin()) { showToast('Apenas admin', '', 'error'); return; }
   switchModalTab('usuarios');
   const m = document.getElementById('modalUsuarios');
   if (m) { m.style.opacity = '1'; m.style.visibility = 'visible'; m.style.pointerEvents = 'auto'; }
@@ -1549,7 +1550,7 @@ function restaurarPerfisPadrao() {
 
 function _aplicarPermissoesHub() {
   const Perm = window.CH.PermissoesService;
-  const role = AuthService.getRole();
+  const role = window.CH.AuthService.getRole();
   const isAdm = ['adm','admin'].includes(role);
 
   // Cards com data-modulo
@@ -1646,10 +1647,10 @@ function showToast(title, sub='', type='success') {
    INIT CHECK — se já logado
 ══════════════════════════════════ */
 window.addEventListener('DOMContentLoaded', () => {
-  if (AuthService.isLogged()) {
+  if (window.CH.AuthService.isLogged()) {
     document.getElementById('lock').style.display = 'none';
     document.getElementById('hub').classList.add('show');
-    const _role2 = AuthService.getRole();
+    const _role2 = window.CH.AuthService.getRole();
     if (['adm','admin'].includes(_role2)) document.body.classList.add('is-admin');
     if (_role2 === 'controlador') document.body.classList.add('is-controlador');
     if (_role2 === 'validador')   document.body.classList.add('is-validador');

@@ -96,7 +96,7 @@ function runAll() {
       const info = {
         FirebaseReady: ch.FirebaseService ? ch.FirebaseService.isReady() : 'sem FirebaseService',
         UID:           ch.FirebaseService ? ch.FirebaseService.getUID() : 'N/A',
-        Role:          ch.AuthService    ? ch.AuthService.getRole()    : 'N/A',
+        Role:          ch.AuthService    ? ch.window.CH.AuthService.getRole()    : 'N/A',
         SyncQueueOk:   !!ch.SyncQueue,
       };
       out.push(card('window.CH', JSON.stringify(info, null, 2), info.FirebaseReady === true ? 'ok' : 'warn'));
