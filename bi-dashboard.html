@@ -225,6 +225,31 @@
 
   .tab-content { display: none; }
   .tab-content.active { display: block; }
+  /* Filtros de período (v4.2) */
+  .filtro-periodo {
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text2); border-radius: .5rem; padding: .3rem .65rem;
+    font-size: .7rem; cursor: pointer; font-weight: 700; transition: .15s;
+  }
+  .filtro-periodo.active, .filtro-periodo:hover {
+    background: rgba(99,102,241,.15); border-color: rgba(99,102,241,.4);
+    color: #818cf8;
+  }
+  /* Det resumo cards */
+  .det-kpi {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: .75rem; padding: .5rem .875rem; min-width: 100px;
+  }
+  .det-kpi-label { font-size: .6rem; font-weight: 700; color: var(--text2);
+                   text-transform: uppercase; letter-spacing: .05em; }
+  .det-kpi-val   { font-size: 1.05rem; font-weight: 800; color: var(--text); margin-top: .15rem; }
+  /* Status badges */
+  .badge-pago    { background:rgba(16,185,129,.15); color:#34d399;
+                   padding:.15rem .4rem; border-radius:999px; font-size:.62rem; font-weight:800; }
+  .badge-fiado   { background:rgba(239,68,68,.15);  color:#f87171;
+                   padding:.15rem .4rem; border-radius:999px; font-size:.62rem; font-weight:800; }
+  .badge-parcial { background:rgba(245,158,11,.15); color:#fbbf24;
+                   padding:.15rem .4rem; border-radius:999px; font-size:.62rem; font-weight:800; }
 
   /* ── Login ────────────────────────────────────────────────────── */
   #login-screen {
@@ -364,6 +389,7 @@
       <button class="tab" onclick="switchTab('produtos')">Produtos</button>
       <button class="tab" onclick="switchTab('tempo')">Tempo</button>
       <button class="tab" onclick="switchTab('parados')">Parados</button>
+      <button class="tab" onclick="switchTab('vendas-det')">🔍 Detalhado</button>
     </div>
 
     <!-- Tab: Visão Geral -->
@@ -449,6 +475,69 @@
         <div id="custos-resumo-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:4px 0"></div>
       </div>
 
+    
+    <!-- Tab: Vendas Detalhadas (v4.2) -->
+    <div id="tab-vendas-det" class="tab-content">
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:1rem;">
+        <span style="font-size:.7rem;font-weight:700;color:var(--text2);">Período:</span>
+        <button class="filtro-periodo active" onclick="setFiltroPeriodo('dia',this)">Hoje</button>
+        <button class="filtro-periodo" onclick="setFiltroPeriodo('hora',this)">Última Hora</button>
+        <button class="filtro-periodo" onclick="setFiltroPeriodo('semana',this)">Semana</button>
+        <button class="filtro-periodo" onclick="setFiltroPeriodo('mes',this)">Mês</button>
+        <button class="filtro-periodo" onclick="setFiltroPeriodo('ano',this)">Ano</button>
+        <select id="filtroOperador"
+                onchange="renderVendasDetalhadas()"
+                style="margin-left:auto;background:var(--card);border:1px solid var(--border);
+                       color:var(--text);border-radius:.5rem;padding:.3rem .5rem;font-size:.72rem;">
+          <option value="">Todos operadores</option>
+        </select>
+        <select id="filtroPgto"
+                onchange="renderVendasDetalhadas()"
+                style="background:var(--card);border:1px solid var(--border);
+                       color:var(--text);border-radius:.5rem;padding:.3rem .5rem;font-size:.72rem;">
+          <option value="">Todas formas</option>
+          <option value="Dinheiro">💵 Dinheiro</option>
+          <option value="PIX">⚡ PIX</option>
+          <option value="Débito">💳 Débito</option>
+          <option value="Crédito">💳 Crédito</option>
+          <option value="Fiado">🤝 Fiado</option>
+          <option value="Misto">🔀 Misto</option>
+        </select>
+        <button onclick="exportarVendasCSV()"
+                style="background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25);
+                       color:#34d399;border-radius:.5rem;padding:.3rem .65rem;font-size:.7rem;
+                       cursor:pointer;font-weight:700;white-space:nowrap;">
+          ⬇ CSV
+        </button>
+      </div>
+      <!-- Resumo rápido -->
+      <div id="det-resumo"
+           style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;"></div>
+      <!-- Tabela -->
+      <div class="table-wrap">
+        <table id="tabela-vendas-det">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Operador</th>
+              <th>Perfil</th>
+              <th>Itens</th>
+              <th>Qtd</th>
+              <th>Total</th>
+              <th>Forma Pgto</th>
+              <th>Status</th>
+              <th>Origem</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-vendas-det">
+            <tr><td colspan="9" style="text-align:center;color:var(--text2);padding:2rem;">
+              Selecione um período para carregar
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="det-rodape"
+         style="font-size:.65rem;color:var(--text2);margin-top:.5rem;text-align:right;"></p>
     </div>
     <!-- /tab-custos -->
 
@@ -655,6 +744,7 @@ function switchTab(id) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
   document.getElementById(`tab-${id}`)?.classList.add('active');
+  if (id === 'vendas-det') renderVendasDetalhadas();
   event.target.classList.add('active');
   // Lazy render específico por tab
   if (id === 'custos')      renderCustos();
@@ -1354,6 +1444,138 @@ async function boot() {
 
 // Aguarda todos os scripts carregarem
 window.addEventListener('load', boot);
+
+// ═══════════════════════════════════════════════════════════════════
+//  VENDAS DETALHADAS — Tab (v4.2)
+// ═══════════════════════════════════════════════════════════════════
+let _filtroPeriodo = 'dia';
+
+function setFiltroPeriodo(periodo, btn) {
+  _filtroPeriodo = periodo;
+  document.querySelectorAll('.filtro-periodo').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderVendasDetalhadas();
+}
+
+function _popularFiltroOperadores(vendas) {
+  const sel = document.getElementById('filtroOperador');
+  if (!sel) return;
+  const atual = sel.value;
+  const ops = [...new Set(vendas.map(v => v.operador).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos operadores</option>' +
+    ops.map(o => `<option value="${o}" ${o===atual?'selected':''}>${o}</option>`).join('');
+}
+
+function renderVendasDetalhadas() {
+  const VS = window.CH?.VendasService;
+  if (!VS?.getVendasDetalhadas) {
+    document.getElementById('tbody-vendas-det').innerHTML =
+      '<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:2rem;">VendasService não disponível</td></tr>';
+    return;
+  }
+
+  const opFiltro   = document.getElementById('filtroOperador')?.value || null;
+  const pgtoFiltro = document.getElementById('filtroPgto')?.value || null;
+  const vendas     = VS.getVendasDetalhadas(_filtroPeriodo, opFiltro, pgtoFiltro);
+
+  // Atualiza dropdown de operadores com todos (sem filtro de operador)
+  const todasOp = VS.getVendasDetalhadas(_filtroPeriodo, null, pgtoFiltro);
+  _popularFiltroOperadores(todasOp);
+
+  // Resumo rápido
+  const total    = vendas.reduce((s,v) => s + v.total, 0);
+  const qtdItens = vendas.reduce((s,v) => s + v.totalItens, 0);
+  const ticket   = vendas.length ? total / vendas.length : 0;
+  const fiadoQtd = vendas.filter(v => v.formaPgto === 'Fiado').length;
+  const fmt      = v => v.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+
+  document.getElementById('det-resumo').innerHTML = [
+    ['Vendas',         vendas.length,    '#818cf8'],
+    ['Total',          fmt(total),        '#34d399'],
+    ['Ticket Médio',   fmt(ticket),       '#60a5fa'],
+    ['Itens Vendidos', qtdItens,          '#a78bfa'],
+    ['Fiado',          fiadoQtd + ' venda(s)', '#f87171'],
+  ].map(([label, val, cor]) => `
+    <div class="det-kpi">
+      <div class="det-kpi-label">${label}</div>
+      <div class="det-kpi-val" style="color:${cor}">${val}</div>
+    </div>`).join('');
+
+  // Tabela
+  const tbody = document.getElementById('tbody-vendas-det');
+  if (!vendas.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:2rem;">Nenhuma venda encontrada para este período</td></tr>';
+    document.getElementById('det-rodape').textContent = '';
+    return;
+  }
+
+  const emojis = { Dinheiro:'💵', PIX:'⚡', Débito:'💳', Crédito:'💳', Fiado:'🤝', Misto:'🔀' };
+
+  tbody.innerHTML = vendas.map(v => {
+    const itensResumido = v.itens.length
+      ? v.itens.map(i => `${i.qtd}× ${i.nome}`).join(', ').substring(0, 60) + (v.itens.map(i=>`${i.qtd}× ${i.nome}`).join(', ').length > 60 ? '…' : '')
+      : '—';
+
+    let statusBadge;
+    if (v.statusPgto === 'pendente_fiado') {
+      statusBadge = `<span class="badge-fiado">⏳ Fiado Pendente</span>`;
+    } else if (v.statusPgto === 'parcial') {
+      statusBadge = `<span class="badge-parcial">◑ Parcial</span>`;
+    } else {
+      statusBadge = `<span class="badge-pago">✓ Pago</span>`;
+    }
+
+    const fiadoInfo = v.fiadoCliente
+      ? `<br><small style="color:#f87171;font-size:.6rem;">👤 ${v.fiadoCliente}</small>`
+      : '';
+
+    return `<tr>
+      <td style="white-space:nowrap;">${v.data}<br><span style="color:var(--text2);font-size:.7rem;">${v.hora}</span></td>
+      <td>${v.operador || '—'}${fiadoInfo}</td>
+      <td><span style="font-size:.65rem;color:var(--text2);">${v.operadorRole || '—'}</span></td>
+      <td style="max-width:160px;font-size:.75rem;" title="${v.itens.map(i=>`${i.qtd}× ${i.nome}`).join(', ')}">${itensResumido}</td>
+      <td style="text-align:center;">${v.totalItens}</td>
+      <td style="font-weight:800;color:var(--text);">${v.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td>
+      <td style="white-space:nowrap;">${emojis[v.formaPgto]||'💰'} ${v.formaPgto}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:.7rem;color:var(--text2);">${v.origem}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('det-rodape').textContent =
+    `${vendas.length} transações · Total: ${fmt(total)} · Filtro: ${_filtroPeriodo}`;
+
+  // Salva referência para exportar CSV
+  window._vendasDetAtual = vendas;
+}
+
+function exportarVendasCSV() {
+  const vendas = window._vendasDetAtual;
+  if (!vendas?.length) { alert('Nenhum dado para exportar.'); return; }
+
+  const escape = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const linhas = [
+    ['Data', 'Hora', 'Operador', 'Perfil', 'Itens', 'Qtd Total', 'Total R$',
+     'Forma Pgto', 'Status', 'Cliente Fiado', 'Origem'].map(escape).join(','),
+    ...vendas.map(v => [
+      v.data, v.hora, v.operador, v.operadorRole,
+      v.itens.map(i => `${i.qtd}x ${i.nome}`).join(' | '),
+      v.totalItens,
+      v.total.toFixed(2).replace('.',','),
+      v.formaPgto, v.statusPgto, v.fiadoCliente || '', v.origem
+    ].map(escape).join(','))
+  ];
+
+  const bom  = '\uFEFF'; // BOM para Excel reconhecer UTF-8
+  const blob = new Blob([bom + linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `vendas_${_filtroPeriodo}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 </script>
 </body>
 </html>

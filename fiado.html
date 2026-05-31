@@ -484,6 +484,21 @@ function init() {
     renderClientes();
   }
   EventBus.on('store:updated', () => { atualizarKpis(); if (_clienteAtualId) renderDetalhe(); else renderClientes(); });
+
+  // ── v4.2: Recebe dívidas geradas pelo PDV / Venda Avulsa ─────────
+  EventBus.on('fiado:divida_registrada', (payload) => {
+    atualizarKpis();
+    if (_clienteAtualId && payload?.clienteId === _clienteAtualId) {
+      renderDetalhe();
+    } else {
+      renderClientes();
+    }
+    UIService.showToast(
+      'Nova dívida registrada',
+      payload?.operador ? `por ${payload.operador}` : '',
+      'warning'
+    );
+  });
 }
 
 /* ═══════════ VISTAS ═══════════ */

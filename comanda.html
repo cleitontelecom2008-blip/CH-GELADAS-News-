@@ -213,6 +213,7 @@ body.is-admin .adm-only{display:flex!important;}
         <button onclick="confirmarFechamento('Pix')"       class="py-4 rounded-2xl bg-blue-600/20 border border-blue-500/25 text-blue-300 font-black text-[10px] uppercase hover:bg-blue-600/35 transition-all active:scale-95 flex flex-col items-center gap-1"><i class="fas fa-qrcode text-xl"></i>Pix</button>
         <button onclick="confirmarFechamento('Débito')"    class="py-4 rounded-2xl bg-purple-600/20 border border-purple-500/25 text-purple-300 font-black text-[10px] uppercase hover:bg-purple-600/35 transition-all active:scale-95 flex flex-col items-center gap-1"><i class="fas fa-credit-card text-xl"></i>Débito</button>
         <button onclick="confirmarFechamento('Crédito')"   class="py-4 rounded-2xl bg-amber-600/20 border border-amber-500/25 text-amber-300 font-black text-[10px] uppercase hover:bg-amber-600/35 transition-all active:scale-95 flex flex-col items-center gap-1"><i class="fas fa-credit-card text-xl"></i>Crédito</button>
+        <button onclick="iniciarFiadoComanda()"            class="col-span-2 py-4 rounded-2xl bg-red-600/20 border border-red-500/25 text-red-300 font-black text-[10px] uppercase hover:bg-red-600/35 transition-all active:scale-95 flex flex-col items-center gap-1"><i class="fas fa-handshake text-xl"></i>Fiado (A Prazo)</button>
       </div>
     </div>
   </div>
@@ -669,7 +670,7 @@ function abrirFechamento() {
   UIService.openModal('modalFecharConta');
 }
 
-async function confirmarFechamento(forma) {
+async function confirmarFechamento(forma, extras = {}) {
   const cmd = Store.getComandas().find(c => c.id === _cmdAtualId);
   if (!cmd) return;
 
@@ -694,7 +695,7 @@ async function confirmarFechamento(forma) {
   if (window.CH?.VendasService) {
     // Usa VendasService: Transaction Firebase + baixa estoque + registra financeiro
     try {
-      venda = await window.CH.VendasService.finalizarVenda(cartProxy, forma);
+      venda = await window.CH.VendasService.finalizarVenda(cartProxy, forma, { ...extras, origem: 'COMANDA' });
       venda.origem      = 'COMANDA';
       venda.nomeComanda = cmd.nome;
     } catch(e) {
@@ -898,5 +899,81 @@ window.addEventListener('DOMContentLoaded', () => {
   <script src="./services/errorPreventionService.js"></script>
   <script src="./services/whitelabelService.js"></script>
   <script src="./services/filialService.js"></script>
+
+<!-- ── MODAL FIADO COMANDA — Seleção de Cliente ── -->
+<div id="modalFiadoComanda"
+     style="position:fixed;inset:0;z-index:200;display:none;align-items:flex-end;
+            justify-content:center;background:rgba(0,0,0,.75);padding:0;">
+  <div style="background:#060810;border:1px solid rgba(255,255,255,.08);
+              border-radius:1.5rem 1.5rem 0 0;width:100%;
+              max-height:80vh;display:flex;flex-direction:column;
+              box-shadow:0 -24px 64px rgba(0,0,0,.6);">
+    <div style="padding:1rem 1.25rem .5rem;display:flex;align-items:center;justify-content:space-between;
+                border-bottom:1px solid rgba(255,255,255,.05);">
+      <span style="font-size:.85rem;font-weight:800;color:#f87171;">🤝 Selecionar Cliente Fiado</span>
+      <button onclick="fecharFiadoComanda()"
+              style="background:rgba(255,255,255,.06);border:none;color:#94a3b8;
+                     width:2rem;height:2rem;border-radius:.5rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:.75rem 1.25rem .5rem;">
+      <input type="text" id="buscaFiadoComanda" placeholder="🔍 Buscar cliente…"
+             oninput="renderFiadoComandaLista()"
+             style="width:100%;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.08);
+                    border-radius:.75rem;color:#f1f5f9;font-size:.9rem;padding:.65rem 1rem;outline:none;
+                    font-family:inherit;">
+    </div>
+    <div id="listaFiadoComanda" style="overflow-y:auto;padding:.5rem 1.25rem 1.5rem;flex:1;"></div>
+  </div>
+</div>
+
+<script>
+// ── FIADO NA COMANDA ──
+function iniciarFiadoComanda() {
+  document.getElementById('buscaFiadoComanda').value = '';
+  renderFiadoComandaLista();
+  document.getElementById('modalFiadoComanda').style.display = 'flex';
+  setTimeout(() => document.getElementById('buscaFiadoComanda')?.focus(), 150);
+}
+
+function fecharFiadoComanda() {
+  document.getElementById('modalFiadoComanda').style.display = 'none';
+}
+
+function renderFiadoComandaLista() {
+  const busca    = (document.getElementById('buscaFiadoComanda')?.value || '').toLowerCase();
+  const clientes = (Store.getFiado() || []);
+  const filtrados = busca
+    ? clientes.filter(c => c.nome.toLowerCase().includes(busca) || (c.telefone||'').includes(busca))
+    : clientes;
+  const lista = document.getElementById('listaFiadoComanda');
+  if (!lista) return;
+  if (!filtrados.length) {
+    lista.innerHTML = '<p style="text-align:center;color:#475569;font-size:.8rem;padding:2rem 0;">Nenhum cliente encontrado.</p>';
+    return;
+  }
+  lista.innerHTML = filtrados.map(c => {
+    const saldoFmt = 'R$ ' + (c.saldo||0).toFixed(2).replace('.',',');
+    const cor      = c.bloqueado ? '#6b7280' : (c.saldo||0) > 0 ? '#f87171' : '#34d399';
+    const label    = c.bloqueado ? 'Bloqueado' : (c.saldo||0) > 0 ? `Deve ${saldoFmt}` : 'Sem dívida';
+    return `
+      <div onclick="confirmarFiadoComanda('${c.id}','${c.nome.replace(/'/g,"\'")}')"
+           style="display:flex;align-items:center;justify-content:space-between;
+                  padding:.7rem .875rem;border-radius:1rem;margin-bottom:.375rem;
+                  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);cursor:pointer;">
+        <div>
+          <p style="font-size:.85rem;font-weight:700;color:#e2e8f0;">${c.nome}</p>
+          ${c.telefone ? `<p style="font-size:.65rem;color:#64748b;">${c.telefone}</p>` : ''}
+        </div>
+        <span style="font-size:.65rem;font-weight:800;padding:.2rem .5rem;border-radius:999px;
+                     background:${cor}22;color:${cor};">${label}</span>
+      </div>`;
+  }).join('');
+}
+
+function confirmarFiadoComanda(clienteId, clienteNome) {
+  fecharFiadoComanda();
+  confirmarFechamento('Fiado', { fiadoClienteId: clienteId, fiadoClienteNome: clienteNome });
+}
+</script>
 </body>
 </html>

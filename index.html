@@ -364,6 +364,42 @@ body.is-admin .valid-only { display: block; }
   letter-spacing: .08em;
   color: #334155;
 }
+
+/* ── MAIS VENDIDOS (v4.2) ── */
+.mv-section { margin:.75rem 0 .25rem; }
+.mv-header  { display:flex;align-items:center;justify-content:space-between;
+              padding:0 1rem .4rem; }
+.mv-scroll  { display:flex;gap:.5rem;padding:.25rem 1rem .75rem;overflow-x:auto;
+              scroll-snap-type:x mandatory;-ms-overflow-style:none;scrollbar-width:none; }
+.mv-scroll::-webkit-scrollbar { display:none; }
+.mv-chip    { flex-shrink:0;scroll-snap-align:start;width:84px;
+              background:rgba(13,17,23,.9);border:1px solid rgba(255,255,255,.07);
+              border-radius:1rem;padding:.625rem .5rem;cursor:pointer;position:relative;
+              transition:transform .15s,border-color .15s;user-select:none;
+              touch-action:manipulation;text-align:center; }
+.mv-chip:active { transform:scale(.93); }
+.mv-chip.mv-adding { animation:mvPulse .3s ease; }
+@keyframes mvPulse {
+  0%   { transform:scale(1);  border-color:rgba(59,130,246,.6); }
+  50%  { transform:scale(1.05);border-color:rgba(59,130,246,.9); }
+  100% { transform:scale(1);  border-color:rgba(255,255,255,.07); }
+}
+.mv-badge { position:absolute;top:-.3rem;right:-.3rem;background:#3b82f6;color:#fff;
+            font-size:.55rem;font-weight:900;width:1.1rem;height:1.1rem;
+            border-radius:999px;display:none;align-items:center;justify-content:center; }
+.mv-badge.show { display:flex; }
+.mv-emoji { font-size:1.4rem;line-height:1;margin-bottom:.25rem; }
+.mv-nome  { font-size:.58rem;font-weight:700;color:#cbd5e1;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.mv-preco { font-size:.62rem;font-weight:800;color:#60a5fa;margin-top:.15rem; }
+
+/* ── VOICE SEARCH (v4.2) ── */
+#btnVoz.voz-ativa { background:rgba(239,68,68,.1);
+  animation:vozPulse 1s ease-in-out infinite; }
+@keyframes vozPulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,.4); }
+  50%     { box-shadow:0 0 0 6px rgba(239,68,68,.0); }
+}
 </style>
 </head>
 <body>
@@ -488,6 +524,20 @@ body.is-admin .valid-only { display: block; }
     </div>
     <div id="grafico7dias" style="display:flex;align-items:flex-end;gap:.3rem;height:3.5rem;padding-bottom:.1rem"></div>
     <div id="grafico7diasLabels" style="display:flex;gap:.3rem;margin-top:.25rem"></div>
+  </div>
+
+  <!-- MAIS VENDIDOS (v4.2) -->
+  <div id="maisVendidosSection" class="mv-section" style="display:none;">
+    <div class="mv-header">
+      <p style="font-size:.58rem;font-weight:800;text-transform:uppercase;
+                letter-spacing:.1em;color:#475569;">⚡ Mais Vendidos</p>
+      <button onclick="renderMaisVendidos()"
+              style="font-size:.65rem;color:#334155;background:none;border:none;
+                     cursor:pointer;padding:.2rem .4rem;border-radius:.4rem;
+                     transition:.15s;"
+              title="Atualizar">↻</button>
+    </div>
+    <div id="maisVendidosScroll" class="mv-scroll"></div>
   </div>
 
   <!-- GRADE DE APPS -->
@@ -1662,6 +1712,195 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => document.getElementById('loginNome')?.focus(), 300);
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  MAIS VENDIDOS — Acesso rápido ao carrinho (v4.2)
+// ═══════════════════════════════════════════════════════════════════
+function renderMaisVendidos() {
+  const VS = window.CH?.VendasService;
+  const ES = window.CH?.EstoqueService;
+  if (!VS) return;
+  const top = VS.getProdutosMaisVendidos(6, 30);
+  if (!top.length) { return; }
+
+  document.getElementById('maisVendidosSection').style.display = 'block';
+  const scroll = document.getElementById('maisVendidosScroll');
+  if (!scroll) return;
+
+  scroll.innerHTML = top.map(p => {
+    const prod  = ES?.getProduto?.(p.prodId);
+    const emoji = prod?.emoji || '🍺';
+    const preco = prod
+      ? 'R$ ' + (prod.preco||0).toFixed(2).replace('.',',')
+      : 'R$ ' + (p.total / Math.max(p.qtd,1)).toFixed(2).replace('.',',');
+    const nome  = (p.nome || 'Produto').substring(0, 13);
+    return `
+      <div class="mv-chip" id="mvchip-${p.prodId}"
+           onclick="mvAdicionarItem('${p.prodId}')"
+           title="${p.nome} — toque para adicionar">
+        <div class="mv-badge" id="mvbadge-${p.prodId}"></div>
+        <div class="mv-emoji">${emoji}</div>
+        <div class="mv-nome">${nome}</div>
+        <div class="mv-preco">${preco}</div>
+      </div>`;
+  }).join('');
+}
+
+function mvAdicionarItem(prodId) {
+  // Dispara evento para a tela de vendas/catálogo adicionar ao carrinho
+  // A tela de vendas (vendas.html) captura esse evento via BroadcastChannel ou direto
+  // No hub (index.html) serve como atalho para abrir a venda com o produto pré-selecionado
+  const prod = window.CH?.EstoqueService?.getProduto?.(prodId);
+  if (!prod) { return; }
+  // Navega para vendas.html com o produto como query param
+  window.location.href = 'vendas.html?add=' + prodId;
+}
+
+function mvAtualizarBadge(prodId, qtd) {
+  const badge = document.getElementById('mvbadge-' + prodId);
+  if (!badge) return;
+  badge.textContent = qtd;
+  badge.classList.toggle('show', qtd > 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  VOICE SEARCH — Busca por voz integrada (v4.2)
+// ═══════════════════════════════════════════════════════════════════
+const VoiceSearch = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, _ouvindo = false, _timeoutId = null;
+
+  function init() {
+    const btn = document.getElementById('btnVoz');
+    if (!btn) return;
+    if (!SR) {
+      btn.title   = 'Busca por voz não suportada neste navegador';
+      btn.style.opacity = '.35';
+      btn.onclick = () => _hubToast('🎤 Busca por voz não suportada neste navegador');
+      return;
+    }
+    btn.onclick = toggle;
+  }
+
+  function toggle() { _ouvindo ? parar() : iniciar(); }
+
+  function iniciar() {
+    rec              = new SR();
+    rec.lang         = 'pt-BR';
+    rec.continuous   = false;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    rec.onstart = () => {
+      _ouvindo = true;
+      setEstado('ouvindo');
+      _timeoutId = setTimeout(() => {
+        if (_ouvindo) { parar(); _hubToast('⏱️ Tempo esgotado — tente novamente'); }
+      }, 7000);
+    };
+
+    rec.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.trim();
+      const isFinal    = event.results[0].isFinal;
+      const campo = document.getElementById('vozBuscaResult');
+      if (campo) campo.textContent = transcript;
+      if (isFinal) { parar(); aplicarBusca(transcript); }
+    };
+
+    rec.onerror = (event) => {
+      parar();
+      const msgs = {
+        'no-speech':     '🎤 Nenhuma fala detectada',
+        'audio-capture': '🎤 Microfone não encontrado',
+        'not-allowed':   '🎤 Permissão negada — habilite o microfone',
+        'network':       '🎤 Erro de conexão',
+      };
+      _hubToast(msgs[event.error] || '❌ Erro no reconhecimento de voz');
+    };
+
+    rec.onend = () => { if (_ouvindo) parar(); };
+    rec.start();
+  }
+
+  function parar() {
+    _ouvindo = false;
+    clearTimeout(_timeoutId);
+    try { rec?.stop(); } catch(e) {}
+    setEstado('inativo');
+    const campo = document.getElementById('vozBuscaResult');
+    if (campo) campo.textContent = '';
+  }
+
+  function aplicarBusca(texto) {
+    // Remove palavras de ruído comuns em PT-BR
+    const limpo = texto
+      .replace(/^(buscar|procurar|quero|me dá|adicionar|comprar|mostrar)\s+/i, '')
+      .trim();
+    // Filtra os app-cards pelo nome
+    const cards = document.querySelectorAll('[data-modulo]');
+    let encontrou = 0;
+    cards.forEach(card => {
+      const nome = card.querySelector('.app-name')?.textContent?.toLowerCase() || '';
+      const match = nome.includes(limpo.toLowerCase());
+      if (match) {
+        card.style.outline = '2px solid rgba(59,130,246,.7)';
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => { card.style.outline = ''; }, 3000);
+        encontrou++;
+      }
+    });
+    _hubToast(encontrou > 0 ? `🎤 "${limpo}" — ${encontrou} encontrado(s)` : `🎤 Nada encontrado para "${limpo}"`);
+  }
+
+  function setEstado(estado) {
+    const btn  = document.getElementById('btnVoz');
+    const icon = document.getElementById('iconVoz');
+    if (!btn) return;
+    btn.classList.toggle('voz-ativa', estado === 'ouvindo');
+    if (icon) {
+      icon.className = estado === 'ouvindo'
+        ? 'fas fa-microphone'
+        : 'fas fa-microphone';
+      icon.style.color = estado === 'ouvindo' ? '#f87171' : '#475569';
+    }
+    btn.title = estado === 'ouvindo' ? 'Ouvindo… (toque para cancelar)' : 'Busca por voz';
+  }
+
+  function _hubToast(msg) {
+    // Reutiliza o sistema de toast existente do hub se disponível
+    const existing = document.getElementById('hubVozToast');
+    let el = existing;
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'hubVozToast';
+      el.style.cssText = 'position:fixed;bottom:5rem;left:50%;transform:translateX(-50%) translateY(4rem);' +
+        'background:rgba(13,17,23,.98);border:1px solid rgba(255,255,255,.09);border-radius:1.25rem;' +
+        'padding:.75rem 1.25rem;color:#f1f5f9;font-size:.8rem;font-weight:700;' +
+        'box-shadow:0 16px 40px rgba(0,0,0,.5);z-index:500;opacity:0;transition:.25s;white-space:nowrap;';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(-50%) translateY(4rem)';
+    }, 3000);
+  }
+
+  return { init, toggle, parar };
+})();
+
+// Inicializar voice search e mais vendidos após store carregar
+document.addEventListener('DOMContentLoaded', () => {
+  VoiceSearch.init();
+});
+// Também inicializa quando store é atualizado (dados chegam do Firebase)
+if (window.CH?.EventBus) {
+  window.CH.EventBus.on('store:updated', () => renderMaisVendidos());
+}
+
 </script>
 </body>
 </html>
