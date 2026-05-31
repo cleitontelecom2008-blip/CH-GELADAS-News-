@@ -6,131 +6,535 @@
 <meta name="theme-color" content="#04060d">
 <title>SaaS Admin — CH Geladas</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
-* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+*  { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-height:100vh; margin:0; }
 
-/* LOCK */
-#lock { position:fixed; inset:0; background:linear-gradient(135deg,#04060d,#0c1220); display:flex; align-items:center; justify-content:center; z-index:100; }
-.lock-card { background:rgba(15,23,42,.95); border:1px solid rgba(255,255,255,.08); border-radius:2rem; padding:2.5rem 2rem; width:min(90vw,360px); }
+/* ── LOCK ─────────────────────────────────────────────────────────── */
+#lock { position:fixed; inset:0; background:linear-gradient(135deg,#04060d,#0c1220);
+        display:flex; align-items:center; justify-content:center; z-index:100; }
+.lock-card { background:rgba(15,23,42,.97); border:1px solid rgba(255,255,255,.08);
+             border-radius:2rem; padding:2.5rem 2rem; width:min(90vw,360px); }
 .lock-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; }
-.inp { width:100%; background:rgba(255,255,255,.04); border:1.5px solid rgba(255,255,255,.08); border-radius:.75rem; color:#f1f5f9; font-size:.95rem; padding:.75rem 1rem; outline:none; font-family:'DM Sans',sans-serif; margin-bottom:.75rem; }
-.inp:focus { border-color:rgba(239,68,68,.5); }
 
-/* HEADER */
-.header { position:sticky; top:0; z-index:50; background:rgba(4,6,13,.9); backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,.06); display:flex; align-items:center; gap:1rem; padding:.875rem 1rem; }
-.header-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; flex:1; }
-.badge-total { font-size:.65rem; font-weight:800; padding:.2rem .6rem; border-radius:999px; background:rgba(239,68,68,.15); color:#f87171; }
+/* ── HEADER ───────────────────────────────────────────────────────── */
+.header { position:sticky; top:0; z-index:50; background:rgba(4,6,13,.94);
+          backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,.06);
+          display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem; }
+.header-title { font-family:'Syne',sans-serif; font-weight:800; font-size:.95rem; flex:1; }
 
-/* STATS */
-.stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.625rem; padding:1rem; }
-.stat-card { background:rgba(12,16,26,.9); border:1px solid rgba(255,255,255,.07); border-radius:1rem; padding:.875rem; text-align:center; }
-.stat-val  { font-family:'Syne',sans-serif; font-weight:800; font-size:1.4rem; }
-.stat-lbl  { font-size:.6rem; text-transform:uppercase; letter-spacing:.07em; color:#64748b; margin-top:.15rem; }
+/* ── TABS ─────────────────────────────────────────────────────────── */
+.tab-bar { display:flex; background:rgba(12,18,32,.8); border-bottom:1px solid rgba(255,255,255,.06);
+           overflow-x:auto; -ms-overflow-style:none; scrollbar-width:none; }
+.tab-bar::-webkit-scrollbar { display:none; }
+.tab-btn { flex:1; min-width:80px; padding:.7rem .5rem; border:none; background:none;
+           color:#475569; font-size:.65rem; font-weight:800; text-transform:uppercase;
+           letter-spacing:.05em; cursor:pointer; border-bottom:2px solid transparent;
+           transition:.2s; white-space:nowrap; display:flex; flex-direction:column;
+           align-items:center; gap:.2rem; }
+.tab-btn i { font-size:.9rem; }
+.tab-btn.active { color:#f87171; border-bottom-color:#f87171; }
+.tab-pane { display:none; padding:0 0 5rem; }
+.tab-pane.active { display:block; }
 
-/* FILTROS */
-.filtros { display:flex; gap:.375rem; padding:0 1rem .75rem; overflow-x:auto; }
-.filtro-btn { flex-shrink:0; padding:.35rem .875rem; border-radius:999px; font-size:.68rem; font-weight:700; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03); color:#64748b; cursor:pointer; white-space:nowrap; transition:.2s; }
+/* ── STATS ────────────────────────────────────────────────────────── */
+.stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; padding:.875rem; }
+.stat-card  { background:rgba(12,18,32,.9); border:1px solid rgba(255,255,255,.07);
+              border-radius:1rem; padding:.75rem; text-align:center; }
+.stat-val   { font-family:'Syne',sans-serif; font-weight:800; font-size:1.35rem; }
+.stat-lbl   { font-size:.57rem; text-transform:uppercase; letter-spacing:.07em; color:#64748b; margin-top:.1rem; }
+
+/* ── FILTROS PILL ─────────────────────────────────────────────────── */
+.filtros { display:flex; gap:.35rem; padding:.5rem .875rem .875rem; overflow-x:auto;
+           -ms-overflow-style:none; scrollbar-width:none; }
+.filtros::-webkit-scrollbar { display:none; }
+.filtro-btn { flex-shrink:0; padding:.3rem .875rem; border-radius:999px; font-size:.65rem;
+              font-weight:800; border:1px solid rgba(255,255,255,.08);
+              background:rgba(255,255,255,.03); color:#64748b; cursor:pointer; transition:.2s; }
 .filtro-btn.on { background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.3); color:#f87171; }
 
-/* EMPRESA CARD */
-.empresa-card { margin:.375rem 1rem; background:rgba(12,16,26,.9); border:1px solid rgba(255,255,255,.07); border-radius:1rem; overflow:hidden; }
-.empresa-header { display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; cursor:pointer; }
-.empresa-nome { font-family:'Syne',sans-serif; font-weight:800; font-size:.88rem; }
-.empresa-id   { font-size:.58rem; color:#475569; font-family:monospace; margin-top:.15rem; }
-.empresa-body { padding:.75rem 1rem; border-top:1px solid rgba(255,255,255,.05); }
+/* ── SEARCH BAR ───────────────────────────────────────────────────── */
+.search-bar { display:flex; align-items:center; gap:.5rem;
+              margin:.5rem .875rem .625rem; position:relative; }
+.search-bar i { position:absolute; left:.875rem; color:#475569; font-size:.75rem; pointer-events:none; }
+.search-bar input { width:100%; background:rgba(255,255,255,.04); border:1.5px solid rgba(255,255,255,.07);
+                    border-radius:.875rem; color:#f1f5f9; font-size:.85rem;
+                    padding:.65rem 1rem .65rem 2.375rem; outline:none; font-family:'DM Sans',sans-serif; }
+.search-bar input:focus { border-color:rgba(239,68,68,.35); }
 
-/* plano select */
-.plano-sel { background:#0f172a; border:1px solid rgba(255,255,255,.08); border-radius:.5rem; color:#e2e8f0; font-size:.75rem; padding:.35rem .625rem; outline:none; cursor:pointer; }
-.pill { font-size:.6rem; font-weight:700; padding:.15rem .45rem; border-radius:999px; }
-.pill-free    { background:rgba(100,116,139,.12); color:#94a3b8; }
-.pill-basico  { background:rgba(59,130,246,.12);  color:#60a5fa; }
-.pill-premium { background:rgba(167,139,250,.12); color:#a78bfa; }
-.pill-ativo   { background:rgba(16,185,129,.12);  color:#34d399; }
-.pill-inativo { background:rgba(239,68,68,.12);   color:#f87171; }
+/* ── EMPRESA CARD ─────────────────────────────────────────────────── */
+.empresa-card   { margin:.35rem .875rem; background:rgba(12,18,32,.9);
+                  border:1px solid rgba(255,255,255,.07); border-radius:1rem; overflow:hidden;
+                  transition:border-color .2s; }
+.empresa-card.aberto { border-color:rgba(239,68,68,.2); }
+.empresa-header { display:flex; align-items:center; justify-content:space-between;
+                  padding:.75rem 1rem; cursor:pointer; }
+.empresa-nome   { font-family:'Syne',sans-serif; font-weight:800; font-size:.85rem; }
+.empresa-id     { font-size:.57rem; color:#475569; font-family:monospace; margin-top:.1rem; }
+.empresa-body   { padding:.75rem 1rem; border-top:1px solid rgba(255,255,255,.05); animation:slideDown .15s ease; }
+@keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
 
-.action-row { display:flex; gap:.5rem; margin-top:.75rem; flex-wrap:wrap; }
-.btn-sm { padding:.4rem .875rem; border-radius:.625rem; font-size:.68rem; font-weight:700; border:none; cursor:pointer; transition:.2s; }
+/* ── PILLS ────────────────────────────────────────────────────────── */
+.pill           { font-size:.58rem; font-weight:800; padding:.15rem .45rem; border-radius:999px; }
+.pill-free      { background:rgba(100,116,139,.12); color:#94a3b8; }
+.pill-basico    { background:rgba(59,130,246,.12);  color:#60a5fa; }
+.pill-premium   { background:rgba(167,139,250,.12); color:#a78bfa; }
+.pill-enterprise{ background:rgba(234,179,8,.12);   color:#facc15; }
+.pill-ativo     { background:rgba(16,185,129,.12);  color:#34d399; }
+.pill-inativo   { background:rgba(239,68,68,.12);   color:#f87171; }
+
+/* ── PLANO SELECT ─────────────────────────────────────────────────── */
+.plano-sel { background:#0f172a; border:1px solid rgba(255,255,255,.08); border-radius:.5rem;
+             color:#e2e8f0; font-size:.75rem; padding:.35rem .625rem; outline:none; cursor:pointer; }
+
+/* ── ACTION ROW ───────────────────────────────────────────────────── */
+.action-row { display:flex; gap:.375rem; margin-top:.75rem; flex-wrap:wrap; }
+.btn-sm     { padding:.4rem .875rem; border-radius:.625rem; font-size:.67rem; font-weight:700;
+              border:none; cursor:pointer; transition:.2s; display:inline-flex; align-items:center; gap:.3rem; }
 .btn-danger  { background:rgba(239,68,68,.15);   color:#f87171; }
 .btn-success { background:rgba(16,185,129,.15);  color:#34d399; }
 .btn-info    { background:rgba(59,130,246,.15);  color:#60a5fa; }
+.btn-purple  { background:rgba(167,139,250,.15); color:#a78bfa; }
+.btn-amber   { background:rgba(245,158,11,.15);  color:#fbbf24; }
 
-/* CONVITE MODAL */
-.modal { position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:200; backdrop-filter:blur(6px); }
-.modal-box { background:#0f172a; border:1px solid rgba(255,255,255,.1); border-radius:1.5rem; padding:1.75rem; width:min(90vw,360px); }
-.conv-badge { font-family:'Syne',sans-serif; font-weight:800; font-size:2rem; letter-spacing:.2em; color:#a78bfa; background:rgba(167,139,250,.1); border:1px solid rgba(167,139,250,.2); border-radius:1rem; padding:1rem; text-align:center; margin:1rem 0; }
+/* ── USUARIOS MINI LIST ───────────────────────────────────────────── */
+.user-row { display:flex; align-items:center; justify-content:space-between;
+            padding:.4rem .625rem; border-radius:.625rem; background:rgba(255,255,255,.02);
+            border:1px solid rgba(255,255,255,.04); margin-bottom:.25rem; }
+.user-nome { font-size:.75rem; font-weight:700; color:#e2e8f0; }
+.user-role { font-size:.6rem; color:#64748b; }
 
-/* TOAST */
-#toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(80px); background:#1e293b; color:#f1f5f9; font-size:.8rem; font-weight:700; padding:.65rem 1.25rem; border-radius:999px; transition:.3s; opacity:0; z-index:999; white-space:nowrap; }
+/* ── INFO ROW ─────────────────────────────────────────────────────── */
+.info-row { display:flex; justify-content:space-between; padding:.35rem 0;
+            border-bottom:1px solid rgba(255,255,255,.04); font-size:.72rem; }
+.info-lbl { color:#475569; font-weight:700; }
+.info-val { color:#cbd5e1; font-family:monospace; font-size:.68rem; }
+
+/* ── CADASTRO FORM ────────────────────────────────────────────────── */
+.form-card { background:rgba(12,18,32,.9); border:1px solid rgba(255,255,255,.07);
+             border-radius:1.25rem; padding:1.25rem; margin:.875rem; }
+.form-title { font-family:'Syne',sans-serif; font-weight:800; font-size:.9rem;
+              color:#f87171; margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; }
+.field-group { margin-bottom:.875rem; }
+.field-label { display:block; font-size:.65rem; font-weight:800; text-transform:uppercase;
+               letter-spacing:.05em; color:#475569; margin-bottom:.35rem; }
+.field-inp { width:100%; background:rgba(255,255,255,.04); border:1.5px solid rgba(255,255,255,.07);
+             border-radius:.75rem; color:#f1f5f9; font-size:.9rem; padding:.7rem 1rem;
+             outline:none; font-family:'DM Sans',sans-serif; transition:.2s; }
+.field-inp:focus { border-color:rgba(239,68,68,.4); background:rgba(239,68,68,.03); }
+.field-select { width:100%; background:rgba(255,255,255,.04); border:1.5px solid rgba(255,255,255,.07);
+                border-radius:.75rem; color:#f1f5f9; font-size:.875rem; padding:.7rem 1rem;
+                outline:none; font-family:'DM Sans',sans-serif; cursor:pointer; }
+.btn-primary { width:100%; padding:1rem; background:linear-gradient(135deg,#dc2626,#b91c1c);
+               color:#fff; border:none; border-radius:1rem; font-family:'Syne',sans-serif;
+               font-weight:800; font-size:.85rem; text-transform:uppercase; cursor:pointer;
+               transition:.2s; letter-spacing:.05em; }
+.btn-primary:disabled { opacity:.45; cursor:not-allowed; }
+.btn-primary:not(:disabled):active { transform:scale(.98); }
+.result-box { background:rgba(16,185,129,.07); border:1px solid rgba(16,185,129,.2);
+              border-radius:1rem; padding:1rem; margin-top:.875rem; display:none; }
+.result-box.show { display:block; animation:slideDown .2s ease; }
+
+/* ── CONVITES ─────────────────────────────────────────────────────── */
+.convite-card { background:rgba(12,18,32,.9); border:1px solid rgba(255,255,255,.07);
+                border-radius:1.25rem; padding:1.25rem; margin:.875rem; }
+.conv-badge   { font-family:'Syne',sans-serif; font-weight:800; font-size:1.8rem;
+                letter-spacing:.15em; color:#a78bfa; background:rgba(167,139,250,.08);
+                border:1px solid rgba(167,139,250,.15); border-radius:1rem;
+                padding:.875rem; text-align:center; margin:.875rem 0; word-break:break-all; }
+
+/* ── MODAL ────────────────────────────────────────────────────────── */
+.modal { position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex;
+         align-items:flex-end; justify-content:center; z-index:200; backdrop-filter:blur(6px); }
+.modal-box { background:#0c1220; border:1px solid rgba(255,255,255,.08);
+             border-radius:1.5rem 1.5rem 0 0; width:100%; max-width:480px;
+             max-height:85vh; overflow-y:auto; padding:1.5rem;
+             box-shadow:0 -24px 64px rgba(0,0,0,.6); }
+.modal-title { font-family:'Syne',sans-serif; font-weight:800; font-size:.9rem;
+               color:#a78bfa; margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; }
+
+/* ── TOAST ────────────────────────────────────────────────────────── */
+#toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(80px);
+         background:#1e293b; color:#f1f5f9; font-size:.8rem; font-weight:700;
+         padding:.65rem 1.25rem; border-radius:999px; transition:.3s; opacity:0; z-index:999;
+         white-space:nowrap; pointer-events:none; }
 #toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
 #toast.ok   { background:#064e3b; color:#34d399; }
 #toast.err  { background:#450a0a; color:#f87171; }
+
+/* ── EMPTY STATE ──────────────────────────────────────────────────── */
+.empty { text-align:center; padding:3rem 1rem; color:#334155; }
+.empty i { font-size:2.5rem; margin-bottom:.75rem; display:block; }
+.empty p { font-size:.8rem; font-weight:700; }
+
+/* ── INP (lock) ───────────────────────────────────────────────────── */
+.inp { width:100%; background:rgba(255,255,255,.04); border:1.5px solid rgba(255,255,255,.08);
+       border-radius:.75rem; color:#f1f5f9; font-size:.95rem; padding:.75rem 1rem;
+       outline:none; font-family:'DM Sans',sans-serif; margin-bottom:.75rem; }
+.inp:focus { border-color:rgba(239,68,68,.5); }
 </style>
 </head>
 <body>
 
-<!-- LOCK -->
+<!-- ══ LOCK ══════════════════════════════════════════════════════════ -->
 <div id="lock">
   <div class="lock-card">
     <div style="font-size:2.5rem;margin-bottom:.75rem">🔐</div>
     <p class="lock-logo">SaaS Admin</p>
-    <p style="font-size:.65rem;color:#334155;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin:.25rem 0 1.75rem">CH Geladas</p>
-    <input type="password" id="adminSenha" class="inp" placeholder="Senha master">
+    <p style="font-size:.63rem;color:#334155;font-weight:800;text-transform:uppercase;
+              letter-spacing:.1em;margin:.25rem 0 1.75rem">CH Geladas · Painel Master</p>
+    <input type="password" id="adminSenha" class="inp" placeholder="Senha master"
+           onkeydown="if(event.key==='Enter') loginAdmin()">
     <div id="adminErr" style="font-size:.7rem;color:#f87171;font-weight:700;min-height:1rem;margin-bottom:.75rem"></div>
-    <button id="btnLoginAdmin" onclick="loginAdmin(this)" style="width:100%;padding:1rem;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:1rem;font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;text-transform:uppercase;cursor:pointer">
+    <button id="btnLoginAdmin" onclick="loginAdmin()"
+            style="width:100%;padding:1rem;background:linear-gradient(135deg,#dc2626,#b91c1c);
+                   color:#fff;border:none;border-radius:1rem;font-family:'Syne',sans-serif;
+                   font-weight:800;font-size:.85rem;text-transform:uppercase;cursor:pointer;">
       Entrar
     </button>
   </div>
 </div>
 
-<!-- APP -->
-<div id="app" style="display:none">
+<!-- ══ APP ═══════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none;">
+
+  <!-- Header -->
   <div class="header">
     <div class="header-title">🔐 SaaS Admin</div>
-    <span id="totalBadge" class="badge-total">0 empresas</span>
-    <button onclick="logoutAdmin()" style="color:#475569;font-size:.8rem;background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
+    <span id="totalBadge"
+          style="font-size:.63rem;font-weight:800;padding:.2rem .6rem;border-radius:999px;
+                 background:rgba(239,68,68,.12);color:#f87171;">0 empresas</span>
+    <button onclick="carregar()"
+            style="color:#475569;font-size:.8rem;background:none;border:none;cursor:pointer;"
+            title="Atualizar dados">
+      <i class="fas fa-sync-alt"></i>
+    </button>
+    <button onclick="logoutAdmin()"
+            style="color:#475569;font-size:.8rem;background:none;border:none;cursor:pointer;"
+            title="Sair">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
   </div>
 
-  <!-- Stats -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-val" id="statTotal" style="color:#f1f5f9">0</div>
-      <div class="stat-lbl">Empresas</div>
+  <!-- Tab Bar -->
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" onclick="abrirTab('empresas',this)">
+      <i class="fas fa-building"></i>Empresas
+    </button>
+    <button class="tab-btn" onclick="abrirTab('cadastrar',this)">
+      <i class="fas fa-plus-circle"></i>Cadastrar
+    </button>
+    <button class="tab-btn" onclick="abrirTab('convites',this)">
+      <i class="fas fa-ticket-alt"></i>Convites
+    </button>
+    <button class="tab-btn" onclick="abrirTab('overview',this)">
+      <i class="fas fa-chart-bar"></i>Overview
+    </button>
+  </div>
+
+  <!-- ═══ ABA: EMPRESAS ════════════════════════════════════════════ -->
+  <div id="tab-empresas" class="tab-pane active">
+
+    <!-- KPIs -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="statTotal" style="color:#f1f5f9">0</div>
+        <div class="stat-lbl">Empresas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="statAtivas" style="color:#34d399">0</div>
+        <div class="stat-lbl">Ativas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="statPremium" style="color:#a78bfa">0</div>
+        <div class="stat-lbl">Premium</div>
+      </div>
     </div>
-    <div class="stat-card">
-      <div class="stat-val" id="statAtivas" style="color:#34d399">0</div>
-      <div class="stat-lbl">Ativas</div>
+
+    <!-- Busca -->
+    <div class="search-bar">
+      <i class="fas fa-search"></i>
+      <input type="text" id="buscaEmpresa" placeholder="Buscar empresa ou ID…"
+             oninput="renderLista()">
     </div>
-    <div class="stat-card">
-      <div class="stat-val" id="statPremium" style="color:#a78bfa">0</div>
-      <div class="stat-lbl">Premium</div>
+
+    <!-- Filtros -->
+    <div class="filtros">
+      <button class="filtro-btn on" onclick="setFiltro('todos',this)">Todos</button>
+      <button class="filtro-btn" onclick="setFiltro('free',this)">Grátis</button>
+      <button class="filtro-btn" onclick="setFiltro('basico',this)">Básico</button>
+      <button class="filtro-btn" onclick="setFiltro('premium',this)">Premium</button>
+      <button class="filtro-btn" onclick="setFiltro('enterprise',this)">Enterprise</button>
+      <button class="filtro-btn" onclick="setFiltro('inativo',this)">Inativos</button>
+    </div>
+
+    <!-- Lista -->
+    <div id="listaEmpresas"></div>
+  </div>
+
+  <!-- ═══ ABA: CADASTRAR ══════════════════════════════════════════ -->
+  <div id="tab-cadastrar" class="tab-pane">
+
+    <div class="form-card">
+      <div class="form-title"><i class="fas fa-store"></i> Nova Empresa</div>
+
+      <div class="field-group">
+        <label class="field-label">Nome da Empresa *</label>
+        <input type="text" id="cadNomeEmpresa" class="field-inp"
+               placeholder="Ex: Bar do João" maxlength="60"
+               oninput="validarCad()">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Nome do Dono (usuário master) *</label>
+        <input type="text" id="cadNomeUsuario" class="field-inp"
+               placeholder="Ex: João Silva" maxlength="40"
+               oninput="validarCad()">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Senha do Dono *</label>
+        <div style="position:relative;">
+          <input type="password" id="cadSenha" class="field-inp" style="padding-right:2.75rem;"
+                 placeholder="Mínimo 4 caracteres" maxlength="32"
+                 oninput="validarCad()">
+          <button type="button"
+                  onclick="toggleSenhaCad()"
+                  style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);
+                         background:none;border:none;color:#475569;cursor:pointer;font-size:.85rem;">
+            <i id="olhoCad" class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Confirmar Senha *</label>
+        <input type="password" id="cadSenhaConf" class="field-inp"
+               placeholder="Repita a senha" maxlength="32"
+               oninput="validarCad()">
+        <p id="cadSenhaErr" style="font-size:.65rem;color:#f87171;font-weight:700;margin-top:.3rem;display:none;"></p>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Plano Inicial</label>
+        <select id="cadPlano" class="field-select">
+          <option value="free">🆓 Grátis</option>
+          <option value="basico">📦 Básico</option>
+          <option value="premium" selected>⭐ Premium</option>
+          <option value="enterprise">🏆 Enterprise</option>
+        </select>
+      </div>
+
+      <div id="cadErr"
+           style="font-size:.72rem;color:#f87171;font-weight:700;min-height:.875rem;
+                  margin-bottom:.625rem;"></div>
+
+      <button id="btnCadastrar" class="btn-primary" disabled onclick="cadastrarEmpresa()">
+        <i class="fas fa-plus-circle" style="margin-right:.375rem;"></i>
+        Cadastrar Empresa
+      </button>
+
+      <!-- Resultado do cadastro -->
+      <div id="cadResultado" class="result-box">
+        <p style="font-size:.7rem;font-weight:800;color:#34d399;margin-bottom:.625rem;">
+          ✅ Empresa cadastrada com sucesso!
+        </p>
+        <div id="cadResultInfo" style="font-size:.72rem;color:#94a3b8;line-height:1.7;"></div>
+        <button onclick="novoCadastro()"
+                style="margin-top:.875rem;width:100%;padding:.75rem;background:rgba(16,185,129,.1);
+                       border:1px solid rgba(16,185,129,.2);border-radius:.75rem;
+                       color:#34d399;font-weight:800;font-size:.75rem;cursor:pointer;">
+          <i class="fas fa-plus" style="margin-right:.3rem;"></i> Cadastrar outra empresa
+        </button>
+      </div>
+    </div>
+
+    <!-- Dicas -->
+    <div style="margin:.5rem .875rem 1rem;background:rgba(59,130,246,.06);
+                border:1px solid rgba(59,130,246,.12);border-radius:1rem;padding:1rem;">
+      <p style="font-size:.65rem;font-weight:800;color:#60a5fa;margin-bottom:.5rem;">
+        <i class="fas fa-info-circle"></i> Sobre o cadastro admin
+      </p>
+      <ul style="font-size:.68rem;color:#64748b;line-height:1.8;margin:0;padding-left:1.1rem;">
+        <li>O cadastro cria a empresa e o usuário dono (role: dono) simultaneamente</li>
+        <li>O ID da empresa é gerado automaticamente a partir do nome</li>
+        <li>O dono pode depois criar convites para colaboradores via <strong style="color:#94a3b8;">Menu → Usuários</strong></li>
+        <li>Você pode alterar o plano a qualquer momento na aba Empresas</li>
+      </ul>
     </div>
   </div>
 
-  <!-- Filtros -->
-  <div class="filtros">
-    <button class="filtro-btn on" onclick="setFiltro('todos',this)">Todos</button>
-    <button class="filtro-btn" onclick="setFiltro('free',this)">Grátis</button>
-    <button class="filtro-btn" onclick="setFiltro('basico',this)">Básico</button>
-    <button class="filtro-btn" onclick="setFiltro('premium',this)">Premium</button>
-    <button class="filtro-btn" onclick="setFiltro('inativo',this)">Inativos</button>
+  <!-- ═══ ABA: CONVITES ═══════════════════════════════════════════ -->
+  <div id="tab-convites" class="tab-pane">
+
+    <div class="convite-card">
+      <div class="form-title"><i class="fas fa-ticket-alt"></i> Gerar Convite</div>
+
+      <div class="field-group">
+        <label class="field-label">Empresa</label>
+        <select id="convEmpresaId" class="field-select" onchange="validarConvite()">
+          <option value="">— Selecione a empresa —</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Perfil do Convidado</label>
+        <select id="convRole" class="field-select">
+          <option value="colaborador">👤 Colaborador</option>
+          <option value="gerente">👔 Gerente</option>
+          <option value="operador">🖥️ Operador PDV</option>
+          <option value="entregador">🚚 Entregador</option>
+          <option value="dono">👑 Dono (co-admin)</option>
+        </select>
+      </div>
+
+      <button id="btnGerarConv" class="btn-primary" disabled onclick="gerarConviteAba()"
+              style="margin-top:.25rem;">
+        <i class="fas fa-magic" style="margin-right:.375rem;"></i>
+        Gerar Código de Convite
+      </button>
+
+      <!-- Resultado -->
+      <div id="convResultado" style="display:none;margin-top:1rem;">
+        <div class="conv-badge" id="convCodigo">——</div>
+        <div style="text-align:center;">
+          <p style="font-size:.68rem;color:#64748b;margin:.25rem 0;">
+            Válido por <strong style="color:#a78bfa;">24 horas</strong> ·
+            Role: <strong style="color:#a78bfa;" id="convRoleLabel">—</strong>
+          </p>
+          <p style="font-size:.68rem;color:#64748b;">
+            Empresa: <strong style="color:#e2e8f0;" id="convEmpresaNome">—</strong>
+          </p>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.875rem;">
+          <button onclick="copiarConvite()"
+                  style="flex:1;padding:.75rem;background:rgba(167,139,250,.1);
+                         border:1px solid rgba(167,139,250,.2);border-radius:.875rem;
+                         color:#a78bfa;font-weight:800;font-size:.75rem;cursor:pointer;">
+            <i class="fas fa-copy"></i> Copiar
+          </button>
+          <button onclick="novoConvite()"
+                  style="flex:1;padding:.75rem;background:rgba(255,255,255,.04);
+                         border:1px solid rgba(255,255,255,.07);border-radius:.875rem;
+                         color:#64748b;font-weight:800;font-size:.75rem;cursor:pointer;">
+            <i class="fas fa-redo"></i> Novo
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Histórico de convites -->
+    <div class="convite-card" style="margin-top:0;">
+      <div class="form-title" style="font-size:.8rem;">
+        <i class="fas fa-history"></i> Como o colaborador usa o convite
+      </div>
+      <ol style="font-size:.72rem;color:#64748b;line-height:2;margin:0;padding-left:1.25rem;">
+        <li>Abrir o sistema CH Geladas no navegador</li>
+        <li>Na tela de login, tocar em <strong style="color:#94a3b8;">"Entrar com convite"</strong></li>
+        <li>Digitar o código gerado aqui</li>
+        <li>Informar nome e criar sua própria senha</li>
+        <li>Pronto — usuário criado com o perfil selecionado</li>
+      </ol>
+    </div>
   </div>
 
-  <!-- Lista de empresas -->
-  <div id="listaEmpresas" style="padding-bottom:2rem"></div>
-</div>
+  <!-- ═══ ABA: OVERVIEW ══════════════════════════════════════════ -->
+  <div id="tab-overview" class="tab-pane">
 
-<!-- MODAL CONVITE -->
-<div id="modalConvite" class="modal" style="display:none">
-  <div class="modal-box">
-    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;color:#a78bfa;margin-bottom:.25rem">🎫 Convite Gerado</div>
-    <p style="font-size:.7rem;color:#64748b;margin-bottom:.25rem">Envie este código para o colaborador:</p>
-    <div class="conv-badge" id="convBadge">——</div>
-    <p style="font-size:.65rem;color:#475569;text-align:center;margin-bottom:1rem">Válido por 24 horas · Role: <span id="convRole"></span></p>
-    <button onclick="document.getElementById('modalConvite').style.display='none'"
-      style="width:100%;padding:.875rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:.875rem;color:#94a3b8;font-family:'Syne',sans-serif;font-weight:800;font-size:.8rem;cursor:pointer">
+    <div style="padding:.875rem;">
+      <!-- KPIs grandes -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.625rem;margin-bottom:.875rem;">
+        <div class="stat-card" style="grid-column:1/-1;background:rgba(239,68,68,.06);
+                                      border-color:rgba(239,68,68,.12);">
+          <div class="stat-val" id="ovTotal" style="color:#f87171;font-size:2rem;">0</div>
+          <div class="stat-lbl">Total de Empresas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="ovAtivas" style="color:#34d399;">0</div>
+          <div class="stat-lbl">Ativas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="ovInativas" style="color:#f87171;">0</div>
+          <div class="stat-lbl">Inativas</div>
+        </div>
+      </div>
+
+      <!-- Distribuição por plano -->
+      <div style="background:rgba(12,18,32,.9);border:1px solid rgba(255,255,255,.07);
+                  border-radius:1.25rem;padding:1rem;margin-bottom:.875rem;">
+        <p style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+                  color:#475569;margin-bottom:.875rem;">Distribuição por Plano</p>
+        <div id="ovPlanos"></div>
+      </div>
+
+      <!-- Lista rápida recentes -->
+      <div style="background:rgba(12,18,32,.9);border:1px solid rgba(255,255,255,.07);
+                  border-radius:1.25rem;padding:1rem;">
+        <p style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+                  color:#475569;margin-bottom:.875rem;">Cadastros Recentes</p>
+        <div id="ovRecentes"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ═══ MODAL DETALHE EMPRESA ═══════════════════════════════════════ -->
+<div id="modalDetalhe" class="modal" style="display:none;" onclick="fecharDetalhe(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title"><i class="fas fa-building"></i> <span id="detNome">—</span></div>
+
+    <div id="detInfos" style="margin-bottom:1rem;"></div>
+
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.875rem;">
+      <span style="font-size:.68rem;color:#64748b;font-weight:700;">Plano:</span>
+      <select class="plano-sel" id="detPlanoSel" onchange="mudarPlanoDetalhe()">
+        <option value="free">Grátis</option>
+        <option value="basico">Básico</option>
+        <option value="premium">Premium</option>
+        <option value="enterprise">Enterprise</option>
+      </select>
+    </div>
+
+    <div class="action-row" style="margin-bottom:1rem;">
+      <button id="detBtnToggle" class="btn-sm" onclick="toggleEmpresaDetalhe()"></button>
+      <button class="btn-sm btn-purple" onclick="gerarConviteDetalhe('colaborador')">
+        <i class="fas fa-user-plus"></i> Convite Colaborador
+      </button>
+      <button class="btn-sm btn-amber" onclick="gerarConviteDetalhe('gerente')">
+        <i class="fas fa-user-tie"></i> Convite Gerente
+      </button>
+    </div>
+
+    <!-- Usuários da empresa -->
+    <p style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+              color:#475569;margin-bottom:.5rem;">Usuários</p>
+    <div id="detUsuarios">
+      <p style="font-size:.72rem;color:#334155;text-align:center;padding:.75rem;">
+        Carregando…
+      </p>
+    </div>
+
+    <!-- Convite gerado inline -->
+    <div id="detConvBox" style="display:none;margin-top:.875rem;">
+      <div class="conv-badge" id="detConvCodigo" style="font-size:1.4rem;padding:.625rem;"></div>
+      <p style="font-size:.65rem;color:#64748b;text-align:center;">
+        Role: <strong style="color:#a78bfa;" id="detConvRole">—</strong> · Válido 24h
+      </p>
+      <button onclick="copiarConviteDetalhe()"
+              style="margin-top:.5rem;width:100%;padding:.65rem;background:rgba(167,139,250,.1);
+                     border:1px solid rgba(167,139,250,.2);border-radius:.75rem;
+                     color:#a78bfa;font-weight:800;font-size:.72rem;cursor:pointer;">
+        <i class="fas fa-copy"></i> Copiar Código
+      </button>
+    </div>
+
+    <button onclick="fecharDetalhe()"
+            style="margin-top:1rem;width:100%;padding:.875rem;background:rgba(255,255,255,.04);
+                   border:1px solid rgba(255,255,255,.07);border-radius:.875rem;
+                   color:#64748b;font-family:'Syne',sans-serif;font-weight:800;
+                   font-size:.8rem;cursor:pointer;">
       Fechar
     </button>
   </div>
@@ -138,70 +542,87 @@ body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-
 
 <div id="toast"></div>
 
+<!-- Scripts -->
 <script src="core.js"></script>
-  <script src="./services/storeService.js"></script>
-  <script src="./services/firebaseService.js"></script>
+<script src="./services/storeService.js"></script>
+<script src="./services/firebaseService.js"></script>
 <script src="./services/saasService.js"></script>
 <script>
 'use strict';
-function _SS() { return window.CH && window.CH.SaasService; }
+
+const SS = () => window.CH?.SaasService;
 
 let _empresas  = [];
 let _filtro    = 'todos';
-let _expandido = null;
+let _detalheId = null;
 
-// ── LOGIN ADMIN ───────────────────────────────────────────────────
-async function loginAdmin(btn) {
-  btn = btn || document.getElementById('btnLoginAdmin');
-  const SS  = _SS();
+// ══ LOGIN / LOGOUT ════════════════════════════════════════════════
+async function loginAdmin() {
+  const btn = document.getElementById('btnLoginAdmin');
   const err = document.getElementById('adminErr');
-  if (!SS) { err.textContent = 'Serviço não carregado.'; return; }
+  if (!SS()) { err.textContent = 'SaasService não carregado.'; return; }
   btn.textContent = 'Verificando…';
   btn.disabled = true;
   try {
-    await SS.loginSuperAdmin(document.getElementById('adminSenha').value);
+    await SS().loginSuperAdmin(document.getElementById('adminSenha').value);
     document.getElementById('lock').style.display = 'none';
     document.getElementById('app').style.display  = 'block';
-    carregar();
+    await carregar();
   } catch(e) {
-    err.textContent = e.message;
+    err.textContent = e.message || 'Senha incorreta';
     btn.textContent = 'Entrar';
     btn.disabled = false;
   }
 }
 
 function logoutAdmin() {
-  if (!confirm('Sair do painel?')) return;
-  _SS() && _SS().logout();
+  if (!confirm('Sair do painel admin?')) return;
+  SS()?.logout();
   location.reload();
 }
 
-document.getElementById('adminSenha').addEventListener('keydown', e => { if (e.key === 'Enter') loginAdmin(document.getElementById('btnLoginAdmin')); });
-
-// Restaura sessão super admin se já estava logado
+// Restaura sessão se já estava logado
 window.addEventListener('DOMContentLoaded', () => {
-  const SS = _SS();
-  if (SS && SS.isSuperAdmin()) {
+  if (SS()?.isSuperAdmin()) {
     document.getElementById('lock').style.display = 'none';
     document.getElementById('app').style.display  = 'block';
     carregar();
   }
 });
 
-// ── CARREGAR EMPRESAS ─────────────────────────────────────────────
+// ══ DADOS ════════════════════════════════════════════════════════
 async function carregar() {
+  document.querySelector('[onclick*="carregar"]').innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>';
   try {
-    _empresas = await _SS().listarEmpresas();
+    _empresas = await SS().listarEmpresas();
     renderStats();
     renderLista();
-  } catch(e) { toast(e.message, 'err'); }
+    popularSelectEmpresas();
+    renderOverview();
+  } catch(e) {
+    toast(e.message, 'err');
+  } finally {
+    document.querySelector('[onclick*="carregar"]').innerHTML = '<i class="fas fa-sync-alt"></i>';
+  }
 }
 
+// ══ TABS ═════════════════════════════════════════════════════════
+function abrirTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ══ ABA: EMPRESAS ═════════════════════════════════════════════════
 function renderStats() {
+  const ativas  = _empresas.filter(e => e.ativo).length;
+  const premium = _empresas.filter(e => ['premium','enterprise'].includes(e.plano)).length;
   document.getElementById('statTotal').textContent   = _empresas.length;
-  document.getElementById('statAtivas').textContent  = _empresas.filter(e => e.ativo).length;
-  document.getElementById('statPremium').textContent = _empresas.filter(e => e.plano === 'premium').length;
-  document.getElementById('totalBadge').textContent  = _empresas.length + ' empresa' + (_empresas.length !== 1 ? 's' : '');
+  document.getElementById('statAtivas').textContent  = ativas;
+  document.getElementById('statPremium').textContent = premium;
+  document.getElementById('totalBadge').textContent  =
+    _empresas.length + ' empresa' + (_empresas.length !== 1 ? 's' : '');
 }
 
 function setFiltro(f, btn) {
@@ -212,106 +633,350 @@ function setFiltro(f, btn) {
 }
 
 function renderLista() {
+  const busca = (document.getElementById('buscaEmpresa')?.value || '').toLowerCase().trim();
   let lista = _empresas;
-  if (_filtro !== 'todos') {
-    if (_filtro === 'inativo') lista = lista.filter(e => !e.ativo);
-    else lista = lista.filter(e => e.plano === _filtro && e.ativo);
+
+  // Filtro por plano/status
+  if (_filtro === 'inativo')    lista = lista.filter(e => !e.ativo);
+  else if (_filtro !== 'todos') lista = lista.filter(e => e.plano === _filtro && e.ativo);
+
+  // Filtro por busca
+  if (busca) {
+    lista = lista.filter(e =>
+      e.nome.toLowerCase().includes(busca) || e.id.toLowerCase().includes(busca)
+    );
   }
 
   const el = document.getElementById('listaEmpresas');
   if (!lista.length) {
-    el.innerHTML = '<p style="text-align:center;color:#475569;padding:2rem;font-size:.8rem">Nenhuma empresa encontrada</p>';
+    el.innerHTML = '<div class="empty"><i class="fas fa-building"></i><p>Nenhuma empresa encontrada</p></div>';
     return;
   }
 
-  const PLANO_CORES = { free:'pill-free', basico:'pill-basico', premium:'pill-premium' };
-  const PLANO_NOMES = { free:'Grátis', basico:'Básico', premium:'Premium' };
+  const PLANO_CORES = { free:'pill-free', basico:'pill-basico', premium:'pill-premium', enterprise:'pill-enterprise' };
+  const PLANO_NOMES = { free:'Grátis', basico:'Básico', premium:'Premium', enterprise:'Enterprise' };
 
-  el.innerHTML = lista.map((e, i) => {
+  el.innerHTML = lista.map(e => {
     const dt = e.criadoEm ? new Date(e.criadoEm).toLocaleDateString('pt-BR') : '—';
-    const planoCls = PLANO_CORES[e.plano] || 'pill-free';
     return `
-    <div class="empresa-card">
-      <div class="empresa-header" onclick="toggleCard('${e.id}')">
+    <div class="empresa-card" id="ecard-${e.id.replace(/[^a-z0-9]/gi,'_')}">
+      <div class="empresa-header" onclick="abrirDetalhe('${e.id}')">
         <div>
           <div class="empresa-nome">${e.nome}</div>
           <div class="empresa-id">${e.id}</div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem">
-          <span class="pill ${planoCls}">${PLANO_NOMES[e.plano]||e.plano}</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;">
+          <span class="pill ${PLANO_CORES[e.plano]||'pill-free'}">${PLANO_NOMES[e.plano]||e.plano}</span>
           <span class="pill ${e.ativo?'pill-ativo':'pill-inativo'}">${e.ativo?'Ativa':'Inativa'}</span>
-        </div>
-      </div>
-      <div id="card-body-${e.id.replace(/[^a-z0-9_]/gi,'_')}" class="empresa-body" style="display:none">
-        <div style="font-size:.68rem;color:#64748b;margin-bottom:.625rem">
-          📅 Criada em: ${dt}
-        </div>
-
-        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.625rem">
-          <span style="font-size:.68rem;color:#64748b;font-weight:700">Plano:</span>
-          <select class="plano-sel" onchange="mudarPlano('${e.id}', this.value)">
-            <option value="free"    ${e.plano==='free'   ?'selected':''}>Grátis</option>
-            <option value="basico"  ${e.plano==='basico' ?'selected':''}>Básico</option>
-            <option value="premium" ${e.plano==='premium'?'selected':''}>Premium</option>
-          </select>
-        </div>
-
-        <div class="action-row">
-          ${e.ativo
-            ? `<button class="btn-sm btn-danger"  onclick="toggleEmpresa('${e.id}',false)"><i class="fas fa-ban mr-1"></i>Desativar</button>`
-            : `<button class="btn-sm btn-success" onclick="toggleEmpresa('${e.id}',true)"><i class="fas fa-check mr-1"></i>Ativar</button>`
-          }
-          <button class="btn-sm btn-info" onclick="gerarConviteAdmin('${e.id}','colaborador')">
-            <i class="fas fa-ticket-alt mr-1"></i>Gerar Convite
-          </button>
         </div>
       </div>
     </div>`;
   }).join('');
 }
 
-function toggleCard(empresaId) {
-  const safeId = empresaId.replace(/[^a-z0-9_]/gi, '_');
-  const body = document.getElementById('card-body-' + safeId);
-  if (!body) return;
-  const open = body.style.display !== 'none';
-  document.querySelectorAll('[id^="card-body-"]').forEach(b => b.style.display = 'none');
-  if (!open) body.style.display = 'block';
+// ══ MODAL DETALHE EMPRESA ═════════════════════════════════════════
+async function abrirDetalhe(empresaId) {
+  const e = _empresas.find(e => e.id === empresaId);
+  if (!e) return;
+  _detalheId = empresaId;
+
+  const PLANO_NOMES = { free:'Grátis', basico:'Básico', premium:'Premium', enterprise:'Enterprise' };
+  const dt = e.criadoEm ? new Date(e.criadoEm).toLocaleDateString('pt-BR') : '—';
+
+  document.getElementById('detNome').textContent = e.nome;
+  document.getElementById('detPlanoSel').value   = e.plano || 'free';
+  document.getElementById('detConvBox').style.display = 'none';
+
+  document.getElementById('detInfos').innerHTML = `
+    <div class="info-row"><span class="info-lbl">ID</span><span class="info-val">${e.id}</span></div>
+    <div class="info-row"><span class="info-lbl">Plano</span><span class="info-val">${PLANO_NOMES[e.plano]||e.plano}</span></div>
+    <div class="info-row"><span class="info-lbl">Status</span><span class="info-val" style="color:${e.ativo?'#34d399':'#f87171'}">${e.ativo?'Ativa':'Inativa'}</span></div>
+    <div class="info-row"><span class="info-lbl">Criada em</span><span class="info-val">${dt}</span></div>
+    <div class="info-row" style="border:none;"><span class="info-lbl">Owner ID</span><span class="info-val">${e.ownerId||'—'}</span></div>`;
+
+  const btn = document.getElementById('detBtnToggle');
+  btn.className = 'btn-sm ' + (e.ativo ? 'btn-danger' : 'btn-success');
+  btn.innerHTML = e.ativo
+    ? '<i class="fas fa-ban"></i> Desativar'
+    : '<i class="fas fa-check"></i> Ativar';
+
+  document.getElementById('modalDetalhe').style.display = 'flex';
+
+  // Carrega usuários
+  document.getElementById('detUsuarios').innerHTML =
+    '<p style="font-size:.72rem;color:#334155;text-align:center;padding:.75rem;">Carregando…</p>';
+  try {
+    // Nota: getUsuariosEmpresa() retorna usuários da empresa do admin logado
+    // Para multi-empresa precisaria de getUsuariosByEmpresaId — usar o que está disponível
+    const usuarios = e._usuarios || [];
+    renderDetUsuarios(usuarios);
+  } catch(err) {
+    document.getElementById('detUsuarios').innerHTML =
+      `<p style="font-size:.7rem;color:#475569;text-align:center;">Usuários não disponíveis via API atual</p>`;
+  }
 }
 
-async function mudarPlano(empresaId, plano) {
+function renderDetUsuarios(usuarios) {
+  const el = document.getElementById('detUsuarios');
+  if (!usuarios.length) {
+    el.innerHTML = '<p style="font-size:.7rem;color:#334155;text-align:center;padding:.5rem;">Sem usuários carregados</p>';
+    return;
+  }
+  const ROLE_COR = { dono:'#facc15', gerente:'#34d399', colaborador:'#60a5fa', operador:'#a78bfa', entregador:'#fb923c' };
+  el.innerHTML = usuarios.map(u => `
+    <div class="user-row">
+      <div>
+        <div class="user-nome">${u.nome}</div>
+        <div class="user-role" style="color:${ROLE_COR[u.role]||'#64748b'}">${u.role}</div>
+      </div>
+      <span class="pill ${u.ativo!==false?'pill-ativo':'pill-inativo'}">${u.ativo!==false?'Ativo':'Inativo'}</span>
+    </div>`).join('');
+}
+
+function fecharDetalhe(event) {
+  if (event && event.target !== document.getElementById('modalDetalhe')) return;
+  document.getElementById('modalDetalhe').style.display = 'none';
+  _detalheId = null;
+}
+
+async function mudarPlanoDetalhe() {
+  if (!_detalheId) return;
+  const plano = document.getElementById('detPlanoSel').value;
   try {
-    await _SS().atualizarPlano(empresaId, plano);
-    toast('Plano atualizado!', 'ok');
+    await SS().atualizarPlano(_detalheId, plano);
+    toast('✅ Plano atualizado!', 'ok');
     await carregar();
-  } catch(e) { toast(e.message, 'err'); }
+    // Atualiza pill no card
+    const e = _empresas.find(e => e.id === _detalheId);
+    if (e) { e.plano = plano; renderLista(); }
+  } catch(err) { toast(err.message, 'err'); }
 }
 
-async function toggleEmpresa(empresaId, ativo) {
-  const acao = ativo ? 'ativar' : 'desativar';
-  if (!confirm(`Deseja ${acao} esta empresa?`)) return;
+async function toggleEmpresaDetalhe() {
+  if (!_detalheId) return;
+  const e = _empresas.find(e => e.id === _detalheId);
+  if (!e) return;
+  const acao = e.ativo ? 'desativar' : 'ativar';
+  if (!confirm(`Deseja ${acao} a empresa "${e.nome}"?`)) return;
   try {
-    await _SS().toggleEmpresa(empresaId, ativo);
-    toast(`Empresa ${ativo ? 'ativada' : 'desativada'}!`, 'ok');
+    await SS().toggleEmpresa(_detalheId, !e.ativo);
+    toast(`✅ Empresa ${e.ativo?'desativada':'ativada'}!`, 'ok');
     await carregar();
-  } catch(e) { toast(e.message, 'err'); }
+    document.getElementById('modalDetalhe').style.display = 'none';
+  } catch(err) { toast(err.message, 'err'); }
 }
 
-async function gerarConviteAdmin(empresaId, role) {
+async function gerarConviteDetalhe(role) {
+  if (!_detalheId) return;
   try {
-    const conv = await _SS().gerarConviteAdmin(empresaId, role);
-    document.getElementById('convBadge').textContent = conv.codigo;
-    document.getElementById('convRole').textContent  = conv.role;
-    document.getElementById('modalConvite').style.display = 'flex';
-  } catch(e) { toast(e.message, 'err'); }
+    const conv = await SS().gerarConviteAdmin(_detalheId, role);
+    document.getElementById('detConvCodigo').textContent = conv.codigo;
+    document.getElementById('detConvRole').textContent   = conv.role;
+    document.getElementById('detConvBox').style.display  = 'block';
+    document.getElementById('detConvBox').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    toast('🎫 Convite gerado!', 'ok');
+  } catch(err) { toast(err.message, 'err'); }
 }
 
-// ── UTILS ─────────────────────────────────────────────────────────
+function copiarConviteDetalhe() {
+  const cod = document.getElementById('detConvCodigo').textContent;
+  navigator.clipboard?.writeText(cod).then(() => toast('📋 Código copiado!', 'ok'));
+}
+
+// ══ ABA: CADASTRAR ════════════════════════════════════════════════
+function validarCad() {
+  const nome   = document.getElementById('cadNomeEmpresa').value.trim();
+  const user   = document.getElementById('cadNomeUsuario').value.trim();
+  const senha  = document.getElementById('cadSenha').value;
+  const conf   = document.getElementById('cadSenhaConf').value;
+  const errEl  = document.getElementById('cadSenhaErr');
+  const btn    = document.getElementById('btnCadastrar');
+
+  if (conf && senha !== conf) {
+    errEl.style.display = 'block';
+    errEl.textContent   = 'As senhas não coincidem';
+  } else {
+    errEl.style.display = 'none';
+  }
+
+  btn.disabled = !(nome && user && senha.length >= 4 && senha === conf);
+}
+
+function toggleSenhaCad() {
+  const inp  = document.getElementById('cadSenha');
+  const icon = document.getElementById('olhoCad');
+  const show = inp.type === 'password';
+  inp.type      = show ? 'text' : 'password';
+  icon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+}
+
+async function cadastrarEmpresa() {
+  const btn  = document.getElementById('btnCadastrar');
+  const errEl = document.getElementById('cadErr');
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cadastrando…';
+
+  try {
+    const result = await SS().registrarEmpresa({
+      nomeEmpresa:  document.getElementById('cadNomeEmpresa').value.trim(),
+      nomeUsuario:  document.getElementById('cadNomeUsuario').value.trim(),
+      senha:        document.getElementById('cadSenha').value,
+      plano:        document.getElementById('cadPlano').value,
+    });
+
+    // Mostrar resultado
+    document.getElementById('cadResultInfo').innerHTML = `
+      <div style="margin-bottom:.5rem;">📋 <strong style="color:#f1f5f9;">ID Empresa:</strong>
+        <span style="font-family:monospace;">${result.empresaId}</span></div>
+      <div style="margin-bottom:.5rem;">👤 <strong style="color:#f1f5f9;">UID Dono:</strong>
+        <span style="font-family:monospace;">${result.uid}</span></div>
+      <div>📦 <strong style="color:#f1f5f9;">Plano:</strong>
+        ${document.getElementById('cadPlano').options[document.getElementById('cadPlano').selectedIndex].text}</div>`;
+
+    document.getElementById('cadResultado').classList.add('show');
+    document.getElementById('btnCadastrar').style.display = 'none';
+
+    await carregar(); // Atualiza lista
+    toast('✅ Empresa cadastrada com sucesso!', 'ok');
+
+    // Deslogar da sessão que foi criada automaticamente pelo registrarEmpresa
+    SS().logout();
+
+  } catch(e) {
+    errEl.textContent = e.message;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-plus-circle"></i> Cadastrar Empresa';
+  }
+}
+
+function novoCadastro() {
+  document.getElementById('cadNomeEmpresa').value  = '';
+  document.getElementById('cadNomeUsuario').value  = '';
+  document.getElementById('cadSenha').value        = '';
+  document.getElementById('cadSenhaConf').value    = '';
+  document.getElementById('cadErr').textContent    = '';
+  document.getElementById('cadResultado').classList.remove('show');
+  document.getElementById('btnCadastrar').style.display = 'block';
+  document.getElementById('btnCadastrar').disabled = true;
+  document.getElementById('cadNomeEmpresa').focus();
+}
+
+// ══ ABA: CONVITES ═════════════════════════════════════════════════
+function popularSelectEmpresas() {
+  const sel = document.getElementById('convEmpresaId');
+  if (!sel) return;
+  const ativas = _empresas.filter(e => e.ativo).sort((a,b) => a.nome.localeCompare(b.nome));
+  sel.innerHTML = '<option value="">— Selecione a empresa —</option>' +
+    ativas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+  validarConvite();
+}
+
+function validarConvite() {
+  const ok = !!document.getElementById('convEmpresaId')?.value;
+  const btn = document.getElementById('btnGerarConv');
+  if (btn) btn.disabled = !ok;
+}
+
+async function gerarConviteAba() {
+  const empresaId = document.getElementById('convEmpresaId').value;
+  const role      = document.getElementById('convRole').value;
+  const empresa   = _empresas.find(e => e.id === empresaId);
+  if (!empresaId) { toast('Selecione a empresa', 'err'); return; }
+
+  const btn = document.getElementById('btnGerarConv');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando…';
+
+  try {
+    const conv = await SS().gerarConviteAdmin(empresaId, role);
+    document.getElementById('convCodigo').textContent    = conv.codigo;
+    document.getElementById('convRoleLabel').textContent = conv.role;
+    document.getElementById('convEmpresaNome').textContent = empresa?.nome || empresaId;
+    document.getElementById('convResultado').style.display = 'block';
+    document.getElementById('convResultado').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    toast('🎫 Convite gerado!', 'ok');
+  } catch(e) {
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-magic"></i> Gerar Código de Convite';
+  }
+}
+
+function copiarConvite() {
+  const cod = document.getElementById('convCodigo').textContent;
+  navigator.clipboard?.writeText(cod).then(() => toast('📋 Código copiado!', 'ok'));
+}
+
+function novoConvite() {
+  document.getElementById('convResultado').style.display = 'none';
+  document.getElementById('convEmpresaId').value = '';
+  validarConvite();
+}
+
+// ══ ABA: OVERVIEW ════════════════════════════════════════════════
+function renderOverview() {
+  const total   = _empresas.length;
+  const ativas  = _empresas.filter(e => e.ativo).length;
+  const inativas = total - ativas;
+
+  document.getElementById('ovTotal').textContent   = total;
+  document.getElementById('ovAtivas').textContent  = ativas;
+  document.getElementById('ovInativas').textContent = inativas;
+
+  // Distribuição por plano
+  const planos = { free:0, basico:0, premium:0, enterprise:0 };
+  _empresas.filter(e => e.ativo).forEach(e => { planos[e.plano] = (planos[e.plano]||0) + 1; });
+  const PLANO_META = {
+    free:       { label:'Grátis',     cor:'#94a3b8', bg:'rgba(100,116,139,.12)' },
+    basico:     { label:'Básico',     cor:'#60a5fa', bg:'rgba(59,130,246,.12)'  },
+    premium:    { label:'Premium',    cor:'#a78bfa', bg:'rgba(167,139,250,.12)' },
+    enterprise: { label:'Enterprise', cor:'#facc15', bg:'rgba(234,179,8,.12)'   },
+  };
+  document.getElementById('ovPlanos').innerHTML = Object.entries(planos).map(([k, v]) => {
+    const pct = ativas > 0 ? Math.round((v / ativas) * 100) : 0;
+    const m   = PLANO_META[k];
+    return `
+      <div style="margin-bottom:.75rem;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:.3rem;">
+          <span style="font-size:.72rem;font-weight:700;color:${m.cor};">${m.label}</span>
+          <span style="font-size:.72rem;font-weight:800;color:#e2e8f0;">${v} (${pct}%)</span>
+        </div>
+        <div style="height:.375rem;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${m.cor};border-radius:999px;transition:width .6s ease;"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Cadastros recentes (últimos 5)
+  const recentes = [..._empresas]
+    .sort((a,b) => (b.criadoEm||'') > (a.criadoEm||'') ? 1 : -1)
+    .slice(0, 5);
+  const PLANO_CORES = { free:'pill-free', basico:'pill-basico', premium:'pill-premium', enterprise:'pill-enterprise' };
+  const PLANO_NOMES = { free:'Grátis', basico:'Básico', premium:'Premium', enterprise:'Enterprise' };
+  document.getElementById('ovRecentes').innerHTML = recentes.length
+    ? recentes.map(e => `
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.04);">
+          <div>
+            <p style="font-size:.78rem;font-weight:700;color:#e2e8f0;">${e.nome}</p>
+            <p style="font-size:.62rem;color:#475569;">
+              ${e.criadoEm ? new Date(e.criadoEm).toLocaleDateString('pt-BR') : '—'}
+            </p>
+          </div>
+          <span class="pill ${PLANO_CORES[e.plano]||'pill-free'}">${PLANO_NOMES[e.plano]||e.plano}</span>
+        </div>`).join('')
+    : '<p style="font-size:.72rem;color:#334155;text-align:center;padding:.75rem;">Sem dados</p>';
+}
+
+// ══ UTILS ════════════════════════════════════════════════════════
 function toast(msg, tipo='ok') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'show ' + tipo;
-  setTimeout(() => t.className = '', 2500);
+  t.className   = 'show ' + tipo;
+  clearTimeout(t._t);
+  t._t = setTimeout(() => { t.className = ''; }, 2800);
 }
 </script>
 </body>
