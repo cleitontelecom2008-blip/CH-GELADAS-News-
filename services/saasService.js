@@ -633,6 +633,7 @@
     listarNotificacoes, arquivarNotificacao,             // v4.2 NOVO
     // Audit
     getAuditLog,             // v4.2 NOVO
+    deletarEmpresa,          // v4.2 NOVO
     // Planos
     getPlanos, getPlano,
   };
