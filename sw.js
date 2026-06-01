@@ -8,7 +8,7 @@
  *   - Fallback offline: serve do cache se rede falhar
  */
 
-const CACHE_NAME = 'ch-geladas-v2'; // v4.1 — bump força update nos 3 dispositivos com SW antigo
+const CACHE_NAME = 'ch-geladas-v4.2'; // v4.2 — saas-admin, saas-login, saas-register adicionados // v4.1 — bump força update nos 3 dispositivos com SW antigo
 
 // Recursos locais que devem funcionar offline
 const SHELL_URLS = [
@@ -29,6 +29,10 @@ const SHELL_URLS = [
   '/services/permissoesService.js',
   '/services/userService.js',
   '/services/backupService.js',
+  '/services/saasService.js',
+  '/saas-admin.html',
+  '/saas-login.html',
+  '/saas-register.html',
 ];
 
 // Domínios externos — nunca cachear (Firebase, APIs)

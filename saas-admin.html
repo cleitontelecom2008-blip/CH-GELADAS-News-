@@ -740,6 +740,10 @@ body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-
       <button class="btn-sm btn-purple" onclick="abrirResetSenha()">
         <i class="fas fa-key"></i> Reset Senha
       </button>
+      <button class="btn-sm" onclick="confirmarApagarEmpresa()"
+              style="background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.3);">
+        <i class="fas fa-trash-alt"></i> Apagar
+      </button>
     </div>
 
     <!-- Assinatura -->
@@ -1625,6 +1629,35 @@ async function carregarAuditLog() {
         </div>`;
     }).join('');
   } catch(err) { lista.innerHTML = `<p style="color:#f87171;text-align:center;font-size:.75rem;">${err.message}</p>`; }
+}
+
+
+// ── APAGAR EMPRESA ──────────────────────────────────────────────────
+async function confirmarApagarEmpresa() {
+  if (!_detalheId) return;
+  const e = _empresas.find(e => e.id === _detalheId);
+  if (!e) return;
+
+  // Confirmação dupla — ação irreversível
+  const conf1 = confirm(
+    `⚠️ APAGAR EMPRESA\n\n"${e.nome}"\n\nIsso irá remover permanentemente:\n` +
+    `• O cadastro da empresa\n• Todos os usuários\n• Todos os convites\n\n` +
+    `Esta ação NÃO PODE ser desfeita.\n\nContinuar?`
+  );
+  if (!conf1) return;
+
+  const conf2 = prompt(`Para confirmar, digite o nome exato da empresa:\n"${e.nome}"`);
+  if (conf2?.trim() !== e.nome.trim()) {
+    toast('❌ Nome incorreto — operação cancelada', 'err');
+    return;
+  }
+
+  try {
+    await SS().deletarEmpresa(_detalheId);
+    toast(`✅ Empresa "${e.nome}" apagada.`, 'ok');
+    document.getElementById('modalDetalhe').style.display = 'none';
+    await carregar();
+  } catch(err) { toast(err.message, 'err'); }
 }
 
 </script>

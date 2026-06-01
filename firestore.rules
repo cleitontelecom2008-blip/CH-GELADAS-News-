@@ -230,8 +230,8 @@ service cloud.firestore {
                     && conviteValido(request.resource.data);
       // Marcar como usado (update) é livre para autenticado (cliente usa o convite)
       allow update: if autenticado();
-      allow delete: if autenticado()
-                    && temAdminToken(request.resource.data);
+      // Delete de convites: controlado pelo saasService (isSuperAdmin check no JS)
+      allow delete: if autenticado();
     }
 
     // ── /saas_configs/{empresaId} — v4.2 NOVO ───────────────────────
@@ -242,7 +242,8 @@ service cloud.firestore {
       allow create,
             update: if autenticado()
                     && temAdminToken(request.resource.data);
-      allow delete: if false; // configs nunca deletadas, só sobrescritas
+      // Delete via batch (deletarEmpresa): controlado pelo isSuperAdmin no JS
+      allow delete: if autenticado();
     }
 
     // ── /saas_notifications/{notifId} — v4.2 NOVO ───────────────────
