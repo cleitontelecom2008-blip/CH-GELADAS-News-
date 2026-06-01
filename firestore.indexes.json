@@ -4,17 +4,242 @@
       "collectionGroup": "vendas",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "dataCurta", "order": "DESCENDING" },
-        { "fieldPath": "criadoEm",  "order": "DESCENDING" }
+        {
+          "fieldPath": "dataCurta",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vendas",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "_deleted",  "order": "ASCENDING"  },
-        { "fieldPath": "dataCurta", "order": "DESCENDING" },
-        { "fieldPath": "criadoEm",  "order": "DESCENDING" }
+        {
+          "fieldPath": "_deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dataCurta",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dataCurta",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "operadorId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "vendas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dataCurta",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "formaPgto",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_empresas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "plano",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_empresas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "plano",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_empresas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ativo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "empresaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nomeNorm",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "empresaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ativo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "role",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "escopo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ativo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "escopo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "empresaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ativo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_audit_log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "empresaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_audit_log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "acao",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "saas_convites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "empresaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "usado",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expiraEm",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "fiadoMovimentacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clienteId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "criadoEm",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],

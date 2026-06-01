@@ -1,37 +1,35 @@
 rules_version = '2';
 
 /**
- * CH Geladas PDV — Firestore Security Rules v4.1
+ * CH Geladas PDV — Firestore Security Rules v4.2
  * ─────────────────────────────────────────────────────────────────────
  *
- * MELHORIAS v4.1 vs v4:
- *   • Adicionadas regras para billing_pedidos (BillingService)
- *   • Adicionadas regras para saas_filiais_{empresaId} (FilialService)
- *   • Adicionadas regras para branding_{empresaId} (WhitelabelService)
- *   Sem essas regras, as três coleções eram bloqueadas pela catch-all
- *   `allow read, write: if false` — causando falha silenciosa em
- *   cobranças PIX, gerenciamento de filiais e carregamento de branding.
+ * NOVIDADES v4.2:
+ *   • saas_configs/{empresaId}    — configs individuais por tenant
+ *   • saas_notifications/{id}     — notificações globais/individuais
+ *   • saas_audit_log/{id}         — log imutável (allow delete: false)
+ *   • checkEmpresaAtiva()         — bloqueia escrita em empresa suspensa
+ *   • conviteValido() corrigido   — campo 'expiraEm' (era 'expiresAt')
+ *   • saas_empresas update        — proteção de campos ownerId/id
  *
- * COLEÇÕES E PERMISSÕES
- * ┌──────────────────────────────────┬──────────────────┬──────────────────────────────┐
- * │  Path                            │  Leitura         │  Escrita                     │
- * ├──────────────────────────────────┼──────────────────┼──────────────────────────────┤
- * │  ch_dados/{col}                  │  autenticado     │  autenticado + adminToken    │
- * │  vendas/{id}                     │  autenticado     │  autenticado (create)        │
- * │                                  │                  │  + adminToken (update/delete)│
- * │  movimentacoes/{id}              │  autenticado     │  autenticado (create válido) │
- * │  categorias/{id}                 │  autenticado     │  adminToken                  │
- * │  fornecedores/{id}               │  autenticado     │  adminToken                  │
- * │  backups/{data}/**               │  adminToken      │  adminToken                  │
- * │  billing_pedidos/{id}            │  autenticado     │  create livre / update admin │
- * │  saas_filiais_{emp}/{id}         │  autenticado     │  adminToken                  │
- * │  branding_{emp}/{id}             │  autenticado     │  adminToken                  │
- * │  saas_empresas/{id}              │  autenticado     │  autenticado (create)        │
- * │                                  │                  │  dono/superAdmin (update)    │
- * │  saas_usuarios/{uid}             │  autenticado     │  criação livre / admin upd   │
- * │  saas_convites/{codigo}          │  autenticado     │  autenticado + conviteValido │
- * │  saas_dados/{emp}/{col}/{doc}    │  autenticado     │  empresaId match ou admin    │
- * └──────────────────────────────────┴──────────────────┴──────────────────────────────┘
+ * TABELA DE PERMISSÕES
+ * ┌──────────────────────────────────┬─────────────────┬──────────────────────────────┐
+ * │  Path                            │  Leitura        │  Escrita                     │
+ * ├──────────────────────────────────┼─────────────────┼──────────────────────────────┤
+ * │  saas_empresas/{id}              │  autenticado    │  create: autenticado válido  │
+ * │                                  │                 │  update: adminToken ou dono  │
+ * │  saas_usuarios/{uid}             │  autenticado    │  create/update: validado     │
+ * │  saas_convites/{codigo}          │  autenticado    │  create: conviteValido()     │
+ * │  saas_configs/{empresaId}        │  autenticado    │  adminToken                  │
+ * │  saas_notifications/{id}         │  autenticado    │  create/update: adminToken   │
+ * │                                  │                 │  delete: if false (imutável) │
+ * │  saas_audit_log/{id}             │  adminToken     │  create: autenticado         │
+ * │                                  │                 │  update/delete: NUNCA        │
+ * │  saas_dados/{emp}/{col}/{doc}    │  autenticado    │  empresaId match + emp ativa │
+ * │  billing_pedidos/{id}            │  autenticado    │  create livre / update admin │
+ * │  saas_filiais_{emp}/{id}         │  autenticado    │  adminToken                  │
+ * │  branding_{emp}/{id}             │  autenticado    │  adminToken                  │
+ * └──────────────────────────────────┴─────────────────┴──────────────────────────────┘
  */
 
 service cloud.firestore {
@@ -41,26 +39,22 @@ service cloud.firestore {
     //  FUNÇÕES AUXILIARES GLOBAIS
     // ════════════════════════════════════════════════════════════════
 
-    /** Qualquer usuário autenticado (anônimo incluso) */
     function autenticado() {
       return request.auth != null;
     }
 
-    /** Documento ch_dados: exige campos 'dados' e 'ts' */
     function docValido(data) {
       return data.keys().hasAll(['dados', 'ts'])
           && data.ts is string
           && data.ts.size() > 0;
     }
 
-    /** Presença de adminToken com tamanho exato (64 chars = SHA-256 hex) */
     function temAdminToken(data) {
       return data.keys().hasAny(['adminToken'])
           && data.adminToken is string
           && data.adminToken.size() == 64;
     }
 
-    /** Estrutura mínima de uma venda */
     function vendaValida(data) {
       return data.keys().hasAll(['id', 'total', 'itens', 'criadoEm'])
           && data.total is number
@@ -68,7 +62,6 @@ service cloud.firestore {
           && data.itens is list;
     }
 
-    /** Estrutura mínima de uma movimentação */
     function movimentacaoValida(data) {
       return data.keys().hasAll(['produtoId', 'tipo', 'quantidade', 'timestamp'])
           && data.quantidade is number
@@ -76,15 +69,14 @@ service cloud.firestore {
           && data.timestamp.size() >= 10;
     }
 
-    /** Estrutura mínima de um convite SaaS */
+    // v4.2 — campo corrigido para 'expiraEm' (era 'expiresAt' — bug anterior)
     function conviteValido(data) {
-      return data.keys().hasAll(['codigo', 'empresaId', 'expiresAt'])
+      return data.keys().hasAll(['codigo', 'empresaId', 'expiraEm'])
           && data.codigo    is string
           && data.empresaId is string
-          && data.expiresAt is string;
+          && data.expiraEm  is string;
     }
 
-    /** Estrutura mínima de um pedido de billing */
     function billingPedidoValido(data) {
       return data.keys().hasAll(['empresaId', 'planoId', 'valor', 'txid', 'status'])
           && data.valor  is number
@@ -93,11 +85,18 @@ service cloud.firestore {
           && data.status == 'aguardando';
     }
 
+    // v4.2 — valida se empresa está ativa antes de permitir escrita de dados
+    // Chamada nas regras de saas_dados para bloquear empresas suspensas
+    function empresaAtiva(empresaId) {
+      let emp = get(/databases/$(database)/documents/saas_empresas/$(empresaId));
+      return emp.data.ativo == true
+          && emp.data.get('status', 'ativo') != 'bloqueado';
+    }
+
     // ════════════════════════════════════════════════════════════════
     //  SISTEMA LEGADO — CH GELADAS (coleções globais)
     // ════════════════════════════════════════════════════════════════
 
-    // ── /ch_dados/{colecao} ──────────────────────────────────────────
     match /ch_dados/{colecao} {
       allow read:  if autenticado();
       allow write: if autenticado()
@@ -105,8 +104,6 @@ service cloud.firestore {
                    && temAdminToken(request.resource.data);
     }
 
-    // ── /vendas/{vendaId} ────────────────────────────────────────────
-    // PDV cria vendas; somente admin atualiza/deleta (Rules v4+)
     match /vendas/{vendaId} {
       allow create: if autenticado()
                     && vendaValida(request.resource.data);
@@ -117,7 +114,6 @@ service cloud.firestore {
                     && temAdminToken(request.resource.data);
     }
 
-    // ── /movimentacoes/{movId} ───────────────────────────────────────
     match /movimentacoes/{movId} {
       allow create: if autenticado()
                     && movimentacaoValida(request.resource.data);
@@ -127,21 +123,18 @@ service cloud.firestore {
                     && temAdminToken(request.resource.data);
     }
 
-    // ── /categorias/{catId} ──────────────────────────────────────────
     match /categorias/{catId} {
       allow read:  if autenticado();
       allow write: if autenticado()
                    && temAdminToken(request.resource.data);
     }
 
-    // ── /fornecedores/{fornId} ───────────────────────────────────────
     match /fornecedores/{fornId} {
       allow read:  if autenticado();
       allow write: if autenticado()
                    && temAdminToken(request.resource.data);
     }
 
-    // ── /backups/{data}/snapshots/{snapshotId} ───────────────────────
     match /backups/{data}/snapshots/{snapshotId} {
       allow read:  if autenticado()
                    && temAdminToken(request.resource.data);
@@ -150,13 +143,9 @@ service cloud.firestore {
     }
 
     // ════════════════════════════════════════════════════════════════
-    //  BILLING — ASSINATURAS E PAGAMENTOS PIX (NOVO v4.1)
+    //  BILLING
     // ════════════════════════════════════════════════════════════════
 
-    // ── /billing_pedidos/{pedidoId} ──────────────────────────────────
-    // Pedido criado pelo BillingService ao gerar cobrança PIX.
-    // Qualquer autenticado cria; somente admin confirma (muda status).
-    // Pedidos nunca são deletados (auditoria financeira).
     match /billing_pedidos/{pedidoId} {
       allow create: if autenticado()
                     && billingPedidoValido(request.resource.data);
@@ -167,30 +156,15 @@ service cloud.firestore {
     }
 
     // ════════════════════════════════════════════════════════════════
-    //  MULTI-FILIAL (NOVO v4.1)
+    //  MULTI-FILIAL E WHITE-LABEL
     // ════════════════════════════════════════════════════════════════
 
-    // ── /saas_filiais_{empresaId}/{docId} ────────────────────────────
-    // FilialService usa padrão de ID composto no nome da coleção.
-    // Leitura livre para qualquer autenticado (necessário para listar
-    // filiais no PDV). Escrita exige adminToken.
-    //
-    // Nota: o padrão ideal seria sub-coleção em saas_dados/{emp}/filiais
-    // para que o wildcard funcionasse. Este padrão é um workaround que
-    // será migrado em versão futura.
     match /saas_filiais_{empresaId}/{docId} {
       allow read:  if autenticado();
       allow write: if autenticado()
                    && temAdminToken(request.resource.data);
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  WHITE-LABEL / BRANDING (NOVO v4.1)
-    // ════════════════════════════════════════════════════════════════
-
-    // ── /branding_{empresaId}/{docId} ────────────────────────────────
-    // Config de tema/logo por empresa. Leitura pública para autenticados
-    // (WhitelabelService carrega após login). Escrita somente admin.
     match /branding_{empresaId}/{docId} {
       allow read:  if autenticado();
       allow write: if autenticado()
@@ -198,7 +172,7 @@ service cloud.firestore {
     }
 
     // ════════════════════════════════════════════════════════════════
-    //  SAAS — MULTI-TENANT (isolamento por empresaId)
+    //  SAAS — MULTI-TENANT
     // ════════════════════════════════════════════════════════════════
 
     // ── /saas_empresas/{empresaId} ───────────────────────────────────
@@ -206,18 +180,21 @@ service cloud.firestore {
       allow read: if autenticado();
 
       allow create: if autenticado()
-                    && request.resource.data.keys().hasAll(['id','nome','plano','ownerId','ativo','criadoEm'])
-                    && request.resource.data.id == empresaId
-                    && request.resource.data.ativo == true;
+                    && request.resource.data.keys().hasAll(
+                         ['id','nome','plano','ownerId','ativo','criadoEm','status'])
+                    && request.resource.data.id    == empresaId
+                    && request.resource.data.ativo == true
+                    && request.resource.data.status == 'ativo';
 
       allow update: if autenticado()
                     && (
+                      // Super-admin pode atualizar tudo (usa adminToken)
                       temAdminToken(request.resource.data)
                       ||
-                      (
-                        !request.resource.data.diff(resource.data).affectedKeys()
-                          .hasAny(['ownerId', 'id'])
-                      )
+                      // Usuário normal: não pode alterar ownerId, id, status, ativo
+                      !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['ownerId', 'id', 'status', 'ativo',
+                                 'bloqueadoPor', 'bloqueadoEm', 'motivoBloqueio'])
                     );
 
       allow delete: if autenticado()
@@ -229,13 +206,18 @@ service cloud.firestore {
       allow read: if autenticado();
 
       allow create: if autenticado()
-                    && request.resource.data.keys().hasAll(['id','empresaId','nome','senhaHash','role','ativo','criadoEm'])
-                    && request.resource.data.id == uid
+                    && request.resource.data.keys().hasAll(
+                         ['id','empresaId','nome','senhaHash','role','ativo','criadoEm'])
+                    && request.resource.data.id    == uid
                     && request.resource.data.ativo == true;
 
       allow update: if autenticado()
-                    && temAdminToken(request.resource.data)
-                    && request.resource.data.empresaId == resource.data.empresaId;
+                    && (
+                      temAdminToken(request.resource.data)
+                      // Permite atualizar apenas campos não-sensíveis sem adminToken
+                      || !request.resource.data.diff(resource.data).affectedKeys()
+                           .hasAny(['senhaHash','role','empresaId','id'])
+                    );
 
       allow delete: if autenticado()
                     && temAdminToken(request.resource.data);
@@ -246,16 +228,60 @@ service cloud.firestore {
       allow read:   if autenticado();
       allow create: if autenticado()
                     && conviteValido(request.resource.data);
-      allow update,
-            delete: if autenticado()
+      // Marcar como usado (update) é livre para autenticado (cliente usa o convite)
+      allow update: if autenticado();
+      allow delete: if autenticado()
                     && temAdminToken(request.resource.data);
     }
 
+    // ── /saas_configs/{empresaId} — v4.2 NOVO ───────────────────────
+    // Leitura: qualquer autenticado (carregada no login pelo podeAcessarModulo())
+    // Escrita: somente adminToken (super-admin ou dono via adminToken gerado)
+    match /saas_configs/{empresaId} {
+      allow read:   if autenticado();
+      allow create,
+            update: if autenticado()
+                    && temAdminToken(request.resource.data);
+      allow delete: if false; // configs nunca deletadas, só sobrescritas
+    }
+
+    // ── /saas_notifications/{notifId} — v4.2 NOVO ───────────────────
+    // Criação/atualização: adminToken
+    // Leitura: qualquer autenticado (feed de notificações no hub)
+    // Delete: NUNCA (arquivar = setar ativo:false)
+    match /saas_notifications/{notifId} {
+      allow read:   if autenticado();
+      allow create: if autenticado()
+                    && request.resource.data.keys().hasAll(
+                         ['id','tipo','titulo','mensagem','escopo','criadoEm','ativo'])
+                    && temAdminToken(request.resource.data);
+      allow update: if autenticado()
+                    && temAdminToken(request.resource.data);
+      allow delete: if false; // arquivar via update ativo:false
+    }
+
+    // ── /saas_audit_log/{logId} — v4.2 NOVO (imutável) ──────────────
+    // Criação: qualquer autenticado (saasService escreve internamente)
+    // Leitura: somente adminToken (log sensível)
+    // Update/Delete: NUNCA — registro imutável por design
+    match /saas_audit_log/{logId} {
+      allow create: if autenticado()
+                    && request.resource.data.keys().hasAll(
+                         ['id','acao','criadoEm']);
+      allow read:   if autenticado()
+                    && temAdminToken(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+
     // ── /saas_dados/{empresaId}/{colecao}/{docId} ────────────────────
+    // v4.2: acrescenta verificação empresaAtiva() para bloquear
+    //       gravação de empresas suspensas mesmo se o JS for burlado
     match /saas_dados/{empresaId}/{colecao}/{docId} {
       allow read: if autenticado();
 
       allow write: if autenticado()
+                   && empresaAtiva(empresaId)   // v4.2 — NOVO guard
                    && (
                      temAdminToken(request.resource.data)
                      ||

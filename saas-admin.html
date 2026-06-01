@@ -173,6 +173,32 @@ body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-
        border-radius:.75rem; color:#f1f5f9; font-size:.95rem; padding:.75rem 1rem;
        outline:none; font-family:'DM Sans',sans-serif; margin-bottom:.75rem; }
 .inp:focus { border-color:rgba(239,68,68,.5); }
+  /* Toggle switch */
+  .toggle-wrap { display:flex;align-items:center;justify-content:space-between;
+                 padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.04); }
+  .toggle-label { font-size:.75rem;font-weight:600;color:#cbd5e1; }
+  .toggle-sub   { font-size:.62rem;color:#475569; }
+  .toggle { position:relative;width:2.5rem;height:1.375rem;cursor:pointer; }
+  .toggle input { opacity:0;width:0;height:0; }
+  .toggle-slider { position:absolute;inset:0;background:rgba(255,255,255,.1);
+                   border-radius:999px;transition:.2s; }
+  .toggle-slider:before { content:'';position:absolute;height:1rem;width:1rem;left:.2rem;
+                           bottom:.2rem;background:#fff;border-radius:50%;transition:.2s; }
+  .toggle input:checked + .toggle-slider { background:#ef4444; }
+  .toggle input:checked + .toggle-slider:before { transform:translateX(1.125rem); }
+  /* Modulo checkbox chip */
+  .modulo-chip { padding:.3rem .7rem;border-radius:999px;font-size:.65rem;font-weight:700;
+                 border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);
+                 color:#64748b;cursor:pointer;transition:.15s;user-select:none; }
+  .modulo-chip.on { background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3);color:#34d399; }
+  /* Audit card */
+  .audit-card { background:rgba(12,18,32,.9);border:1px solid rgba(255,255,255,.06);
+                border-radius:.875rem;padding:.75rem;margin-bottom:.375rem; }
+  .audit-acao { font-size:.72rem;font-weight:800; }
+  .audit-meta { font-size:.62rem;color:#64748b;margin-top:.15rem; }
+  /* Notif card */
+  .notif-card { background:rgba(12,18,32,.9);border:1px solid rgba(255,255,255,.06);
+                border-radius:.875rem;padding:.75rem;margin-bottom:.375rem; }
 </style>
 </head>
 <body>
@@ -230,6 +256,15 @@ body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-
     </button>
     <button class="tab-btn" onclick="abrirTab('overview',this)">
       <i class="fas fa-chart-bar"></i>Overview
+    </button>
+    <button class="tab-btn" onclick="abrirTab('configs',this)">
+      <i class="fas fa-sliders-h"></i>Configs
+    </button>
+    <button class="tab-btn" onclick="abrirTab('notifs',this)">
+      <i class="fas fa-bell"></i>Notifs
+    </button>
+    <button class="tab-btn" onclick="abrirTab('auditoria',this)">
+      <i class="fas fa-history"></i>Auditoria
     </button>
   </div>
 
@@ -480,6 +515,207 @@ body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-
 
 </div><!-- /app -->
 
+
+
+  <!-- ═══ ABA: CONFIGS ═══════════════════════════════════════════ -->
+  <div id="tab-configs" class="tab-pane">
+    <div style="padding:.875rem .875rem .5rem;display:flex;align-items:center;gap:.5rem;">
+      <select id="configEmpresaId" class="field-select" style="flex:1;" onchange="carregarConfigs()">
+        <option value="">— Selecione a empresa —</option>
+      </select>
+      <button onclick="carregarConfigs()"
+              style="padding:.7rem 1rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);
+                     border-radius:.75rem;color:#818cf8;font-size:.75rem;font-weight:700;cursor:pointer;">
+        <i class="fas fa-sync-alt"></i>
+      </button>
+    </div>
+
+    <div id="configsForm" style="display:none;padding:0 .875rem 2rem;">
+      <!-- Limites -->
+      <div class="form-card" style="margin:0 0 .75rem;">
+        <div class="form-title"><i class="fas fa-tachometer-alt"></i> Limites</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+          <div class="field-group" style="margin:0;">
+            <label class="field-label">Máx. Usuários</label>
+            <input type="number" id="cfgMaxUsuarios" class="field-inp" min="1" placeholder="Do plano">
+          </div>
+          <div class="field-group" style="margin:0;">
+            <label class="field-label">Máx. Filiais</label>
+            <input type="number" id="cfgMaxFiliais" class="field-inp" min="1" placeholder="Do plano">
+          </div>
+          <div class="field-group" style="margin:0;grid-column:1/-1;">
+            <label class="field-label">Vendas / Mês</label>
+            <input type="number" id="cfgVendasMes" class="field-inp" min="1" placeholder="Do plano">
+          </div>
+        </div>
+        <button onclick="salvarConfigsSecao('limites')" class="btn-sm btn-info" style="margin-top:.75rem;">
+          <i class="fas fa-save"></i> Salvar Limites
+        </button>
+      </div>
+
+      <!-- Módulos -->
+      <div class="form-card" style="margin:0 0 .75rem;">
+        <div class="form-title"><i class="fas fa-puzzle-piece"></i> Módulos Ativos</div>
+        <div id="cfgModulos" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;"></div>
+        <button onclick="salvarConfigsSecao('modulos')" class="btn-sm btn-info">
+          <i class="fas fa-save"></i> Salvar Módulos
+        </button>
+      </div>
+
+      <!-- Tema -->
+      <div class="form-card" style="margin:0 0 .75rem;">
+        <div class="form-title"><i class="fas fa-palette"></i> Tema / Whitelabel</div>
+        <div class="field-group">
+          <label class="field-label">Nome do Sistema</label>
+          <input type="text" id="cfgNomeSistema" class="field-inp" placeholder="CH Geladas PDV">
+        </div>
+        <div style="display:flex;gap:.75rem;align-items:flex-end;">
+          <div class="field-group" style="flex:1;margin:0;">
+            <label class="field-label">Cor Primária</label>
+            <input type="color" id="cfgCorPrimaria" value="#ef4444"
+                   style="width:100%;height:2.5rem;background:none;border:1.5px solid rgba(255,255,255,.08);
+                          border-radius:.75rem;cursor:pointer;">
+          </div>
+          <div class="field-group" style="flex:2;margin:0;">
+            <label class="field-label">URL Logo</label>
+            <input type="url" id="cfgLogo" class="field-inp" placeholder="https://...">
+          </div>
+        </div>
+        <button onclick="salvarConfigsSecao('tema')" class="btn-sm btn-info" style="margin-top:.75rem;">
+          <i class="fas fa-save"></i> Salvar Tema
+        </button>
+      </div>
+
+      <!-- Flags -->
+      <div class="form-card" style="margin:0 0 .75rem;">
+        <div class="form-title"><i class="fas fa-flag"></i> Flags de Funcionalidade</div>
+        <div id="cfgFlags" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem;"></div>
+        <button onclick="salvarConfigsSecao('flags')" class="btn-sm btn-info">
+          <i class="fas fa-save"></i> Salvar Flags
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ABA: NOTIFICAÇÕES ═════════════════════════════════════ -->
+  <div id="tab-notifs" class="tab-pane">
+    <div style="padding:.875rem;">
+
+      <!-- Formulário de disparo -->
+      <div class="form-card" style="margin:0 0 .875rem;">
+        <div class="form-title"><i class="fas fa-paper-plane"></i> Enviar Notificação</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+          <div class="field-group" style="margin:0;">
+            <label class="field-label">Tipo</label>
+            <select id="notifTipo" class="field-select">
+              <option value="aviso">📢 Aviso</option>
+              <option value="manutencao">🔧 Manutenção</option>
+              <option value="cobranca">💳 Cobrança</option>
+              <option value="feature">✨ Novidade</option>
+            </select>
+          </div>
+          <div class="field-group" style="margin:0;">
+            <label class="field-label">Prioridade</label>
+            <select id="notifPrioridade" class="field-select">
+              <option value="info">ℹ️ Informação</option>
+              <option value="warning">⚠️ Atenção</option>
+              <option value="critical">🔴 Crítico</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Escopo</label>
+          <select id="notifEscopo" class="field-select" onchange="toggleNotifEscopo()">
+            <option value="global">🌐 Global (todas as empresas)</option>
+            <option value="empresa">🏢 Empresa específica</option>
+            <option value="plano">📦 Por plano</option>
+          </select>
+        </div>
+
+        <div id="notifEmpresaWrap" class="field-group" style="display:none;">
+          <label class="field-label">Empresa</label>
+          <select id="notifEmpresaId" class="field-select">
+            <option value="">— Selecione —</option>
+          </select>
+        </div>
+        <div id="notifPlanoWrap" class="field-group" style="display:none;">
+          <label class="field-label">Plano</label>
+          <select id="notifPlanoAlvo" class="field-select">
+            <option value="free">Grátis</option>
+            <option value="basico">Básico</option>
+            <option value="premium">Premium</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Título <span style="color:#475569;font-size:.6rem;">(máx 80 chars)</span></label>
+          <input type="text" id="notifTitulo" class="field-inp" maxlength="80" placeholder="Ex: Manutenção programada"
+                 oninput="document.getElementById('notifTituloCount').textContent=(80-this.value.length)+' restantes'">
+          <p id="notifTituloCount" style="font-size:.62rem;color:#475569;margin-top:.2rem;">80 restantes</p>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Mensagem</label>
+          <textarea id="notifMensagem" class="field-inp" rows="3"
+                    style="resize:vertical;min-height:80px;"
+                    placeholder="Detalhes da notificação…"></textarea>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Expira em <span style="color:#475569;font-size:.6rem;">(opcional)</span></label>
+          <input type="date" id="notifExpiraEm" class="field-inp">
+        </div>
+
+        <button onclick="dispararNotificacao()" class="btn-primary" style="margin-top:.25rem;">
+          <i class="fas fa-paper-plane" style="margin-right:.375rem;"></i>Enviar Notificação
+        </button>
+      </div>
+
+      <!-- Lista de notificações ativas -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+        <p style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#475569;">
+          Notificações Ativas
+        </p>
+        <button onclick="carregarNotificacoes()"
+                style="font-size:.65rem;color:#475569;background:none;border:none;cursor:pointer;">
+          ↻ Atualizar
+        </button>
+      </div>
+      <div id="listaNotifs"></div>
+    </div>
+  </div>
+
+  <!-- ═══ ABA: AUDITORIA ════════════════════════════════════════ -->
+  <div id="tab-auditoria" class="tab-pane">
+    <div style="padding:.875rem;">
+      <div style="display:flex;gap:.5rem;margin-bottom:.875rem;flex-wrap:wrap;">
+        <select id="auditEmpresaFiltro" class="field-select" style="flex:1;">
+          <option value="">Todas as empresas</option>
+        </select>
+        <select id="auditAcaoFiltro" class="field-select" style="min-width:140px;">
+          <option value="">Todas as ações</option>
+          <option value="bloquear">Bloquear</option>
+          <option value="desbloquear">Desbloquear</option>
+          <option value="mudar_plano">Mudar Plano</option>
+          <option value="criar_empresa">Criar Empresa</option>
+          <option value="reset_senha">Reset Senha</option>
+          <option value="login_as">Login As</option>
+          <option value="enviar_notif">Enviar Notif</option>
+          <option value="atualizar_configs">Atualizar Configs</option>
+        </select>
+        <button onclick="carregarAuditLog()"
+                style="padding:.65rem 1rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);
+                       border-radius:.75rem;color:#f87171;font-size:.72rem;font-weight:700;cursor:pointer;">
+          <i class="fas fa-search"></i> Filtrar
+        </button>
+      </div>
+      <div id="listaAudit"></div>
+    </div>
+  </div>
+
 <!-- ═══ MODAL DETALHE EMPRESA ═══════════════════════════════════════ -->
 <div id="modalDetalhe" class="modal" style="display:none;" onclick="fecharDetalhe(event)">
   <div class="modal-box" onclick="event.stopPropagation()">
@@ -487,7 +723,29 @@ body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-
 
     <div id="detInfos" style="margin-bottom:1rem;"></div>
 
-    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.875rem;">
+
+
+    <!-- Controle de Acesso -->
+    <p style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+              color:#475569;margin:.875rem 0 .4rem;">Controle de Acesso</p>
+    <div class="action-row" style="margin-bottom:.75rem;">
+      <button id="detBtnToggle" class="btn-sm" onclick="toggleEmpresaDetalhe()"></button>
+      <button class="btn-sm btn-amber" onclick="abrirBloqueioComMotivo()"
+              id="detBtnBloquear" style="display:none;">
+        <i class="fas fa-ban"></i> Bloquear c/ Motivo
+      </button>
+      <button class="btn-sm btn-info" onclick="loginAsEmpresa()" title="Acessar como o dono da empresa">
+        <i class="fas fa-user-secret"></i> Login As
+      </button>
+      <button class="btn-sm btn-purple" onclick="abrirResetSenha()">
+        <i class="fas fa-key"></i> Reset Senha
+      </button>
+    </div>
+
+    <!-- Assinatura -->
+    <p style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+              color:#475569;margin:.5rem 0 .4rem;">Assinatura</p>
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;">
       <span style="font-size:.68rem;color:#64748b;font-weight:700;">Plano:</span>
       <select class="plano-sel" id="detPlanoSel" onchange="mudarPlanoDetalhe()">
         <option value="free">Grátis</option>
@@ -495,15 +753,33 @@ body { background:#04060d; color:#f1f5f9; font-family:'DM Sans',sans-serif; min-
         <option value="premium">Premium</option>
         <option value="enterprise">Enterprise</option>
       </select>
+      <span id="detPlanoStatus" style="font-size:.62rem;"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.875rem;flex-wrap:wrap;">
+      <span style="font-size:.68rem;color:#64748b;font-weight:700;">Expira em:</span>
+      <input type="date" id="detExpiraEm"
+             style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+                    border-radius:.5rem;color:#f1f5f9;font-size:.75rem;padding:.3rem .5rem;outline:none;">
+      <button onclick="salvarExpiracao()" class="btn-sm btn-info" style="padding:.35rem .625rem;">
+        <i class="fas fa-save"></i>
+      </button>
+      <button onclick="estenderAssinatura(30)" class="btn-sm btn-success" style="padding:.35rem .625rem;">
+        +30d
+      </button>
     </div>
 
+    <!-- Convites -->
+    <p style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+              color:#475569;margin:.5rem 0 .4rem;">Convites</p>
     <div class="action-row" style="margin-bottom:1rem;">
-      <button id="detBtnToggle" class="btn-sm" onclick="toggleEmpresaDetalhe()"></button>
       <button class="btn-sm btn-purple" onclick="gerarConviteDetalhe('colaborador')">
-        <i class="fas fa-user-plus"></i> Convite Colaborador
+        <i class="fas fa-user-plus"></i> Colaborador
       </button>
       <button class="btn-sm btn-amber" onclick="gerarConviteDetalhe('gerente')">
-        <i class="fas fa-user-tie"></i> Convite Gerente
+        <i class="fas fa-user-tie"></i> Gerente
+      </button>
+      <button class="btn-sm btn-info" onclick="gerarConviteDetalhe('operador')">
+        <i class="fas fa-desktop"></i> Operador
       </button>
     </div>
 
@@ -978,6 +1254,379 @@ function toast(msg, tipo='ok') {
   clearTimeout(t._t);
   t._t = setTimeout(() => { t.className = ''; }, 2800);
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  EXTENSÕES v4.2 — Bloquear, Configs, Notifs, Auditoria
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Auxiliares ─────────────────────────────────────────────────────
+const TODOS_MODULOS = [
+  'vendas','estoque','fiado','financeiro','delivery','comanda',
+  'relatorios','aprovacao','bi','cambio','auditoria','monitor',
+];
+
+const PLANO_STATUS_META = {
+  ativo:     { cor:'#34d399', label:'Ativo'     },
+  trial:     { cor:'#60a5fa', label:'Trial'     },
+  vencido:   { cor:'#f87171', label:'Vencido'   },
+  cancelado: { cor:'#94a3b8', label:'Cancelado' },
+};
+
+function _popularSelectEmpresasExtras() {
+  ['configEmpresaId','notifEmpresaId','auditEmpresaFiltro'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const ativas = _empresas.filter(e => e.ativo).sort((a,b) => a.nome.localeCompare(b.nome));
+    const head = id === 'auditEmpresaFiltro' ? '<option value="">Todas as empresas</option>'
+                                              : '<option value="">— Selecione a empresa —</option>';
+    sel.innerHTML = head + ativas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+  });
+}
+
+// Hook no carregar() existente
+const _origCarregar = carregar;
+window.carregar = async function() {
+  await _origCarregar.call(this);
+  _popularSelectEmpresasExtras();
+};
+
+// Hook no abrirTab() — carrega dados ao entrar nas abas novas
+const _origAbrirTab = abrirTab;
+window.abrirTab = function(id, btn) {
+  _origAbrirTab(id, btn);
+  if (id === 'notifs')    carregarNotificacoes();
+  if (id === 'auditoria') carregarAuditLog();
+};
+
+// ── MODAL DETALHE — extensões ───────────────────────────────────────
+const _origAbrirDetalhe = abrirDetalhe;
+window.abrirDetalhe = async function(empresaId) {
+  await _origAbrirDetalhe(empresaId);
+  const e = _empresas.find(e => e.id === empresaId);
+  if (!e) return;
+
+  // Badge de status do plano
+  const pm = PLANO_STATUS_META[e.planoStatus || 'ativo'];
+  const el = document.getElementById('detPlanoStatus');
+  if (el) {
+    el.innerHTML = `<span style="padding:.15rem .45rem;border-radius:999px;font-size:.6rem;font-weight:800;
+      background:${pm.cor}22;color:${pm.cor};">${pm.label}</span>`;
+  }
+
+  // Data de expiração
+  const expEl = document.getElementById('detExpiraEm');
+  if (expEl && e.planoExpiraEm) {
+    expEl.value = e.planoExpiraEm.slice(0,10);
+  } else if (expEl) { expEl.value = ''; }
+
+  // Botão bloquear c/ motivo só aparece quando ativa
+  const btnBloquear = document.getElementById('detBtnBloquear');
+  if (btnBloquear) btnBloquear.style.display = e.status !== 'bloqueado' ? 'inline-flex' : 'none';
+
+  // Carrega usuários via API
+  try {
+    const usuarios = await SS().getUsuariosByEmpresaId(empresaId);
+    renderDetUsuarios(usuarios);
+  } catch(err) {
+    document.getElementById('detUsuarios').innerHTML =
+      `<p style="font-size:.7rem;color:#475569;text-align:center;">${err.message}</p>`;
+  }
+};
+
+// ── BLOQUEAR COM MOTIVO ─────────────────────────────────────────────
+function abrirBloqueioComMotivo() {
+  if (!_detalheId) return;
+  const e = _empresas.find(e => e.id === _detalheId);
+  const motivo = prompt(`Motivo do bloqueio para "${e?.nome}":\n(deixe vazio para mensagem padrão)`);
+  if (motivo === null) return; // cancelou
+  setStatusEmpresaAdmin(_detalheId, 'bloqueado', motivo || null);
+}
+
+async function setStatusEmpresaAdmin(empresaId, status, motivo) {
+  try {
+    await SS().setStatusEmpresa(empresaId, status, motivo);
+    toast(`✅ Empresa ${status === 'bloqueado' ? 'bloqueada' : 'desbloqueada'}!`, 'ok');
+    await carregar();
+    document.getElementById('modalDetalhe').style.display = 'none';
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+// Override toggleEmpresaDetalhe para usar setStatusEmpresa
+window.toggleEmpresaDetalhe = async function() {
+  if (!_detalheId) return;
+  const e = _empresas.find(e => e.id === _detalheId);
+  const novoStatus = (e.ativo && e.status !== 'bloqueado') ? 'bloqueado' : 'ativo';
+  if (!confirm(`Deseja ${novoStatus === 'bloqueado' ? 'BLOQUEAR' : 'ATIVAR'} a empresa "${e.nome}"?`)) return;
+  await setStatusEmpresaAdmin(_detalheId, novoStatus, null);
+};
+
+// ── LOGIN AS ────────────────────────────────────────────────────────
+async function loginAsEmpresa() {
+  if (!_detalheId) return;
+  const e = _empresas.find(e => e.id === _detalheId);
+  if (!confirm(`Acessar o sistema como "${e?.nome}"?\nVocê será redirecionado para o painel deles.`)) return;
+  try {
+    const { token, empresaId } = await SS().gerarLoginAsToken(_detalheId);
+    // Abre nova aba com token na URL — saas-login.html trata loginAs
+    const url = `saas-login.html?loginAs=${empresaId}&token=${token}`;
+    window.open(url, '_blank');
+    toast('🔑 Token gerado — nova aba aberta', 'ok');
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+// ── RESET SENHA ─────────────────────────────────────────────────────
+async function abrirResetSenha() {
+  if (!_detalheId) return;
+  const novaSenha = prompt('Nova senha para o DONO desta empresa:\n(mínimo 4 caracteres)');
+  if (!novaSenha) return;
+  if (novaSenha.length < 4) { toast('Senha mínima: 4 caracteres', 'err'); return; }
+  if (!confirm(`Confirma reset de senha para "${_empresas.find(e=>e.id===_detalheId)?.nome}"?`)) return;
+  try {
+    await SS().resetSenhaDono(_detalheId, novaSenha);
+    toast('✅ Senha redefinida com sucesso!', 'ok');
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+// ── ASSINATURA ──────────────────────────────────────────────────────
+async function salvarExpiracao() {
+  if (!_detalheId) return;
+  const val = document.getElementById('detExpiraEm').value;
+  const expiraEm = val ? new Date(val + 'T23:59:59').toISOString() : null;
+  try {
+    await SS().atualizarPlano(_detalheId, _empresas.find(e=>e.id===_detalheId)?.plano, { expiraEm });
+    toast('✅ Expiração salva!', 'ok');
+    await carregar();
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+async function estenderAssinatura(dias) {
+  if (!_detalheId) return;
+  const e = _empresas.find(e => e.id === _detalheId);
+  try {
+    await SS().atualizarPlano(_detalheId, e.plano, { extensaoDias: dias });
+    toast(`✅ Assinatura estendida por ${dias} dias!`, 'ok');
+    await carregar();
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+// ── ABA CONFIGS ─────────────────────────────────────────────────────
+let _configsAtuais = {};
+
+async function carregarConfigs() {
+  const empresaId = document.getElementById('configEmpresaId').value;
+  if (!empresaId) {
+    document.getElementById('configsForm').style.display = 'none';
+    return;
+  }
+  try {
+    _configsAtuais = await SS().getConfigs(empresaId);
+    document.getElementById('configsForm').style.display = 'block';
+
+    const empresa = _empresas.find(e => e.id === empresaId);
+    const planoMeta = SS().getPlano(empresa?.plano);
+
+    // Limites
+    document.getElementById('cfgMaxUsuarios').value = _configsAtuais?.limites?.maxUsuarios || '';
+    document.getElementById('cfgMaxFiliais').value  = _configsAtuais?.limites?.maxFiliais  || '';
+    document.getElementById('cfgVendasMes').value   = _configsAtuais?.limites?.vendasMes   || '';
+
+    // Módulos
+    const modulosAtivos = _configsAtuais?.modulos || planoMeta.modulos;
+    document.getElementById('cfgModulos').innerHTML = TODOS_MODULOS.map(m => {
+      const on = modulosAtivos.includes(m);
+      return `<div class="modulo-chip ${on?'on':''}" onclick="toggleModulo(this,'${m}')">${m}</div>`;
+    }).join('');
+
+    // Tema
+    document.getElementById('cfgNomeSistema').value = _configsAtuais?.tema?.nomeSistema || '';
+    document.getElementById('cfgCorPrimaria').value = _configsAtuais?.tema?.corPrimaria || '#ef4444';
+    document.getElementById('cfgLogo').value        = _configsAtuais?.tema?.logo        || '';
+
+    // Flags
+    const FLAGS = [
+      { key:'aprovacaoVendas', label:'Aprovação de Vendas',       sub:'Ativa fluxo de aprovação antes de concluir venda' },
+      { key:'notifWhatsapp',   label:'Notificações WhatsApp',     sub:'Envia resumo de vendas via WhatsApp' },
+      { key:'fiadoLimite',     label:'Controle de Limite Fiado',  sub:'Ativa limite de crédito por cliente' },
+    ];
+    const flags = _configsAtuais?.flags || {};
+    document.getElementById('cfgFlags').innerHTML = FLAGS.map(f => `
+      <div class="toggle-wrap">
+        <div>
+          <div class="toggle-label">${f.label}</div>
+          <div class="toggle-sub">${f.sub}</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="flag_${f.key}" ${flags[f.key]?'checked':''}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`).join('');
+
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+function toggleModulo(chip, modulo) {
+  chip.classList.toggle('on');
+}
+
+async function salvarConfigsSecao(secao) {
+  const empresaId = document.getElementById('configEmpresaId').value;
+  if (!empresaId) return;
+  let patch = {};
+
+  if (secao === 'limites') {
+    patch.limites = {
+      maxUsuarios: parseInt(document.getElementById('cfgMaxUsuarios').value) || null,
+      maxFiliais:  parseInt(document.getElementById('cfgMaxFiliais').value)  || null,
+      vendasMes:   parseInt(document.getElementById('cfgVendasMes').value)   || null,
+    };
+  }
+  if (secao === 'modulos') {
+    patch.modulos = [...document.querySelectorAll('.modulo-chip.on')].map(c => c.textContent.trim());
+  }
+  if (secao === 'tema') {
+    patch.tema = {
+      nomeSistema: document.getElementById('cfgNomeSistema').value.trim() || null,
+      corPrimaria: document.getElementById('cfgCorPrimaria').value,
+      logo:        document.getElementById('cfgLogo').value.trim() || null,
+    };
+  }
+  if (secao === 'flags') {
+    patch.flags = {};
+    document.querySelectorAll('[id^="flag_"]').forEach(el => {
+      patch.flags[el.id.replace('flag_','')] = el.checked;
+    });
+  }
+
+  try {
+    await SS().salvarConfigs(empresaId, patch);
+    toast(`✅ ${secao} salvo!`, 'ok');
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+// ── ABA NOTIFICAÇÕES ────────────────────────────────────────────────
+function toggleNotifEscopo() {
+  const escopo = document.getElementById('notifEscopo').value;
+  document.getElementById('notifEmpresaWrap').style.display = escopo === 'empresa' ? 'block' : 'none';
+  document.getElementById('notifPlanoWrap').style.display   = escopo === 'plano'   ? 'block' : 'none';
+}
+
+async function dispararNotificacao() {
+  const tipo      = document.getElementById('notifTipo').value;
+  const prioridade= document.getElementById('notifPrioridade').value;
+  const escopo    = document.getElementById('notifEscopo').value;
+  const titulo    = document.getElementById('notifTitulo').value.trim();
+  const mensagem  = document.getElementById('notifMensagem').value.trim();
+  const expiraVal = document.getElementById('notifExpiraEm').value;
+  const empresaId = document.getElementById('notifEmpresaId').value;
+  const planoAlvo = document.getElementById('notifPlanoAlvo').value;
+
+  if (!titulo || !mensagem) { toast('Título e mensagem são obrigatórios', 'err'); return; }
+  if (escopo === 'empresa' && !empresaId) { toast('Selecione a empresa', 'err'); return; }
+
+  const payload = {
+    tipo, prioridade, escopo, titulo, mensagem,
+    empresaId: escopo === 'empresa' ? empresaId : null,
+    planoAlvo: escopo === 'plano'   ? planoAlvo : null,
+    expiraEm:  expiraVal ? new Date(expiraVal + 'T23:59:59').toISOString() : null,
+  };
+
+  try {
+    await SS().enviarNotificacao(payload);
+    toast('✅ Notificação enviada!', 'ok');
+    document.getElementById('notifTitulo').value   = '';
+    document.getElementById('notifMensagem').value = '';
+    carregarNotificacoes();
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+async function carregarNotificacoes() {
+  const lista = document.getElementById('listaNotifs');
+  if (!lista) return;
+  lista.innerHTML = '<p style="text-align:center;color:#334155;font-size:.75rem;padding:1rem;">Carregando…</p>';
+  try {
+    const notifs = await SS().listarNotificacoes();
+    if (!notifs.length) {
+      lista.innerHTML = '<div class="empty"><i class="fas fa-bell-slash"></i><p>Nenhuma notificação</p></div>';
+      return;
+    }
+    const TIPO_EMOJI = { aviso:'📢', manutencao:'🔧', cobranca:'💳', feature:'✨', bloqueio:'🔴' };
+    const PRIOR_COR  = { info:'#60a5fa', warning:'#fbbf24', critical:'#f87171' };
+    lista.innerHTML = notifs.slice(0, 30).map(n => `
+      <div class="notif-card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
+          <div style="flex:1;">
+            <p style="font-size:.75rem;font-weight:800;color:#e2e8f0;">
+              ${TIPO_EMOJI[n.tipo]||'📢'} ${n.titulo}
+            </p>
+            <p style="font-size:.68rem;color:#64748b;margin:.2rem 0;">${n.mensagem}</p>
+            <p style="font-size:.6rem;color:#334155;">
+              ${n.escopo === 'global' ? '🌐 Global' : n.escopo === 'empresa' ? `🏢 ${n.empresaId}` : `📦 Plano ${n.planoAlvo}`}
+              · <span style="color:${PRIOR_COR[n.prioridade]||'#64748b'}">${n.prioridade}</span>
+              · ${new Date(n.criadoEm).toLocaleString('pt-BR')}
+              · ${(n.leiturasPor||[]).length} leitura(s)
+            </p>
+          </div>
+          <button onclick="arquivarNotif('${n.id}')" title="Arquivar"
+                  style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);
+                         color:#f87171;border-radius:.5rem;padding:.3rem .5rem;
+                         font-size:.65rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+            <i class="fas fa-archive"></i>
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(err) { lista.innerHTML = `<p style="color:#f87171;text-align:center;font-size:.75rem;">${err.message}</p>`; }
+}
+
+async function arquivarNotif(id) {
+  if (!confirm('Arquivar esta notificação?')) return;
+  try {
+    await SS().arquivarNotificacao(id);
+    toast('✅ Arquivada!', 'ok');
+    carregarNotificacoes();
+  } catch(err) { toast(err.message, 'err'); }
+}
+
+// ── ABA AUDITORIA ───────────────────────────────────────────────────
+async function carregarAuditLog() {
+  const lista = document.getElementById('listaAudit');
+  if (!lista) return;
+  lista.innerHTML = '<p style="text-align:center;color:#334155;font-size:.75rem;padding:1rem;">Carregando…</p>';
+
+  const empresaId = document.getElementById('auditEmpresaFiltro')?.value || null;
+  const acaoFiltro = document.getElementById('auditAcaoFiltro')?.value || null;
+
+  try {
+    let logs = await SS().getAuditLog(empresaId || null, 100);
+    if (acaoFiltro) logs = logs.filter(l => l.acao === acaoFiltro);
+
+    if (!logs.length) {
+      lista.innerHTML = '<div class="empty"><i class="fas fa-history"></i><p>Nenhum registro</p></div>';
+      return;
+    }
+
+    const ACAO_COR = {
+      bloquear:'#f87171', desbloquear:'#34d399', mudar_plano:'#a78bfa',
+      criar_empresa:'#60a5fa', reset_senha:'#fbbf24', login_as:'#fb923c',
+      enviar_notif:'#818cf8', atualizar_configs:'#34d399',
+    };
+    lista.innerHTML = logs.map(l => {
+      const cor = ACAO_COR[l.acao] || '#64748b';
+      const emp = _empresas.find(e => e.id === l.empresaId);
+      return `
+        <div class="audit-card">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.2rem;">
+            <span class="audit-acao" style="color:${cor};">${l.acao.replace(/_/g,' ').toUpperCase()}</span>
+            ${emp ? `<span style="font-size:.62rem;color:#475569;">— ${emp.nome}</span>` : ''}
+          </div>
+          <p class="audit-meta">
+            👤 ${l.adminNome || '—'} · 🕐 ${l.criadoEm ? new Date(l.criadoEm).toLocaleString('pt-BR') : '—'}
+            ${l.motivo ? `<br>📝 ${l.motivo}` : ''}
+          </p>
+        </div>`;
+    }).join('');
+  } catch(err) { lista.innerHTML = `<p style="color:#f87171;text-align:center;font-size:.75rem;">${err.message}</p>`; }
+}
+
 </script>
 </body>
 </html>

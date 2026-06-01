@@ -74,6 +74,17 @@ input::placeholder { color:#475569; }
 </style>
 </head>
 <body>
+<!-- ── BANNER LOGIN AS (aparece apenas quando há token na URL) ── -->
+<div id="loginAsBanner"
+     style="display:none;position:fixed;top:0;left:0;right:0;z-index:200;
+            background:linear-gradient(90deg,#7c3aed,#4f46e5);
+            padding:.625rem 1rem;text-align:center;">
+  <p style="font-size:.72rem;font-weight:800;color:#fff;margin:0;">
+    🔑 <span id="loginAsEmpNome">Empresa</span> — Modo Suporte (Super Admin)
+  </p>
+</div>
+
+
 
 <div class="card">
   <div style="text-align:center;margin-bottom:1.5rem">
@@ -218,7 +229,14 @@ async function doLogin() {
     window.location.href = 'index.html';
 
   } catch (e) {
-    errEl.textContent = e.message || 'Erro ao entrar. Tente novamente.';
+    let msg = e.message || 'Erro ao entrar. Tente novamente.';
+    // v4.2 — trata erros estruturados do SaasService
+    if (msg.startsWith('SAAS_EMPRESA_BLOQUEADA:')) {
+      msg = '🔒 ' + msg.replace('SAAS_EMPRESA_BLOQUEADA:', '');
+    } else if (msg.startsWith('SAAS_PLANO_EXPIRADO:')) {
+      msg = '⏰ ' + msg.replace('SAAS_PLANO_EXPIRADO:', '');
+    }
+    errEl.textContent = msg;
     btnEl.disabled = false;
     btnEl.textContent = 'Entrar';
     document.getElementById('loginSenha').value = '';
@@ -227,11 +245,59 @@ async function doLogin() {
 }
 
 /* ── Se já tem sessão SaaS ativa, vai direto pro hub ──────────────── */
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const sess = window.CH?.SaasService?.getSession?.();
   if (sess?.empresaId) {
     window.location.replace('index.html');
+    return;
   }
+
+  // ── v4.2: Tratamento de Login As (impersonation) ─────────────────
+  const params    = new URLSearchParams(window.location.search);
+  const loginAsId = params.get('loginAs');
+  const token     = params.get('token');
+
+  if (loginAsId && token) {
+    // Mostra banner informativo
+    const banner = document.getElementById('loginAsBanner');
+    if (banner) banner.style.display = 'block';
+
+    const formArea = document.querySelector('.form-card') || document.querySelector('form') ||
+                     document.querySelector('.login-card');
+
+    // Substitui o conteúdo do formulário por tela de validação
+    const container = document.getElementById('loginAsContainer');
+    if (container) {
+      container.style.display = 'block';
+    } else {
+      // Fallback: processa automaticamente sem UI extra
+    }
+
+    try {
+      const SS = window.CH?.SaasService;
+      if (!SS) throw new Error('SaasService não carregado');
+
+      // Exibe feedback enquanto valida
+      const empNomeEl = document.getElementById('loginAsEmpNome');
+
+      // Busca nome da empresa para exibir no banner (best-effort)
+      const sess2 = await SS.validarLoginAsToken(loginAsId, token);
+      if (empNomeEl) empNomeEl.textContent = sess2.empresaId;
+
+      // Redireciona para o hub como se fosse o dono
+      window.location.replace('index.html?loginAs=1');
+
+    } catch(e) {
+      alert('❌ Token de acesso inválido ou expirado.
+
+' + e.message);
+      // Remove params da URL e mostra login normal
+      window.history.replaceState({}, '', 'saas-login.html');
+      document.getElementById('buscaNome')?.focus();
+    }
+    return;
+  }
+
   document.getElementById('buscaNome').focus();
 });
 </script>
